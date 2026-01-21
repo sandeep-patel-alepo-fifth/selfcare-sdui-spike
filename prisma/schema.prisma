@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// UI Schema Models
+// ============================================================================
+
+model Screen {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  screenId    String   @unique // e.g., "dashboard", "onboarding-welcome"
+  version     String   @default("1.0")
+  tenantId    String?  @db.ObjectId
+  name        String
+  description String?
+  schema      Json     // The full screen JSON schema
+  isActive    Boolean  @default(true)
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  versions    ScreenVersion[]
+
+  @@index([tenantId])
+  @@index([tags])
+}
+
+model ScreenVersion {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  screenId    String   @db.ObjectId
+  version     String
+  schema      Json
+  changelog   String?
+  createdAt   DateTime @default(now())
+  createdBy   String?
+
+  screen      Screen   @relation(fields: [screenId], references: [id], onDelete: Cascade)
+
+  @@index([screenId])
+}
+
+model Flow {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  flowId      String   @unique // e.g., "onboarding", "recharge"
+  version     String   @default("1.0")
+  tenantId    String?  @db.ObjectId
+  name        String
+  description String?
+  schema      Json     // The full flow JSON schema
+  isActive    Boolean  @default(true)
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+// ============================================================================
+// Theme Models
+// ============================================================================
+
+model Theme {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  themeId     String   @unique
+  name        String
+  description String?
+  colors      Json     // Color tokens
+  typography  Json?    // Typography tokens
+  spacing     Json?    // Spacing tokens
+  shadows     Json?    // Shadow tokens
+  borderRadius Json?   // Border radius tokens
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenants     Tenant[]
+}
+
+// ============================================================================
+// Tenant Models
+// ============================================================================
+
+model Tenant {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId    String   @unique
+  name        String
+  logo        String?
+  favicon     String?
+  themeId     String?  @db.ObjectId
+  features    Json?    // Feature flags
+  customCss   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  theme       Theme?   @relation(fields: [themeId], references: [id])
+  screens     Screen[]
+  flows       Flow[]
+}
+
+// ============================================================================
+// Component Library Models
+// ============================================================================
+
+model ComponentDefinition {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  type         String   @unique // e.g., "button", "card", "usageWidget"
+  name         String
+  description  String?
+  category     String   // e.g., "layout", "input", "display", "domain"
+  propsSchema  Json     // JSON Schema for props validation
+  defaultProps Json?    // Default prop values
+  examples     Json?    // Example usages
+  isBuiltIn    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+}
+
+// ============================================================================
+// A/B Testing Models
+// ============================================================================
+
+model Experiment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  experimentId String  @unique
+  name        String
+  description String?
+  screenId    String?  // Target screen
+  flowId      String?  // Target flow
+  variants    Json     // Array of variant definitions
+  traffic     Json     // Traffic allocation per variant
+  status      ExperimentStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+}
+
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+// ============================================================================
+// Audit Models
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  action      String   // e.g., "CREATE_SCREEN", "UPDATE_SCREEN", "DELETE_SCREEN"
+  entityType  String   // e.g., "Screen", "Flow", "Theme"
+  entityId    String
+  userId      String?
+  tenantId    String?
+  changes     Json?    // Diff of changes
+  metadata    Json?    // Additional context
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([tenantId])
+  @@index([createdAt])
+}
