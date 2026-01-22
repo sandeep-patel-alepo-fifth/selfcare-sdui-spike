@@ -4,35 +4,222 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
   <title>Alepo Enterprise Selfcare Documentation</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-defaults.css">
   <style>
     :root {
+      /* Theme colors */
       --theme-color: #6366f1;
-      --sidebar-width: 280px;
+      --theme-color-secondary: #4f46e5;
+
+      /* Sidebar */
+      --sidebar-width: 300px;
+      --sidebar-background: #f8fafc;
+      --sidebar-border-color: #e2e8f0;
+      --sidebar-nav-link-color: #334155;
+      --sidebar-nav-link-color--active: #6366f1;
+      --sidebar-nav-link-font-weight--active: 600;
+
+      /* Content */
+      --content-max-width: 900px;
+
+      /* Base typography */
+      --base-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --base-font-size: 17px;
+      --base-line-height: 1.7;
+      --base-color: #1e293b;
+
+      /* Headings */
+      --heading-font-weight: 700;
+      --heading-color: #0f172a;
+      --heading-h1-font-size: 2.25rem;
+      --heading-h2-font-size: 1.75rem;
+      --heading-h2-border-color: #e2e8f0;
+      --heading-h2-margin: 2.5rem 0 1rem;
+      --heading-h3-font-size: 1.35rem;
+
+      /* Code blocks */
+      --code-font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, monospace;
+      --code-font-size: 0.9em;
+      --code-block-padding: 1.25rem;
+      --code-block-margin: 1.5rem 0;
+      --code-block-border-radius: 8px;
+      --code-block-background: #1e293b;
+      --code-inline-background: #f1f5f9;
+      --code-inline-color: #6366f1;
+      --code-inline-padding: 0.2em 0.4em;
+      --code-inline-border-radius: 4px;
+
+      /* Links */
+      --link-color: #6366f1;
+      --link-text-decoration: none;
+      --link-text-decoration--hover: underline;
+
+      /* Blockquotes */
+      --blockquote-border-color: #6366f1;
+      --blockquote-background: #f8fafc;
+      --blockquote-padding: 1rem 1.5rem;
+
+      /* Tables */
+      --table-head-background: #f8fafc;
+      --table-row-odd-background: #ffffff;
+      --table-row-even-background: #f8fafc;
+      --table-cell-padding: 0.75rem 1rem;
+
+      /* Notice/Alert blocks */
+      --notice-tip-background: #ecfdf5;
+      --notice-tip-border-color: #10b981;
+      --notice-important-background: #fef3c7;
+      --notice-important-border-color: #f59e0b;
+
+      /* Search */
+      --search-input-border-color: #e2e8f0;
+      --search-input-background-color: #ffffff;
+      --search-result-keyword-background: #fef08a;
+    }
+
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --sidebar-background: #1e293b;
+        --sidebar-border-color: #334155;
+        --sidebar-nav-link-color: #cbd5e1;
+        --base-color: #e2e8f0;
+        --heading-color: #f8fafc;
+        --code-inline-background: #334155;
+        --code-inline-color: #a5b4fc;
+        --blockquote-background: #1e293b;
+        --table-head-background: #1e293b;
+        --table-row-odd-background: #0f172a;
+        --table-row-even-background: #1e293b;
+        --search-input-background-color: #1e293b;
+        --search-input-border-color: #334155;
+      }
+
+      body {
+        background-color: #0f172a;
+      }
+
+      .markdown-section {
+        background-color: #0f172a;
+      }
+    }
+
+    /* Better paragraph spacing */
+    .markdown-section p {
+      margin: 1.25rem 0;
+    }
+
+    /* Better list styling */
+    .markdown-section ul, .markdown-section ol {
+      padding-left: 1.5rem;
+      margin: 1rem 0;
+    }
+
+    .markdown-section li {
+      margin: 0.5rem 0;
+    }
+
+    /* Code block enhancements */
+    .markdown-section pre {
+      position: relative;
+    }
+
+    .markdown-section pre > code {
+      line-height: 1.6;
+    }
+
+    /* Sidebar active state */
+    .sidebar-nav li.active > a {
+      border-left: 3px solid var(--theme-color);
+      padding-left: 12px;
+      margin-left: -15px;
+    }
+
+    /* Better mobile experience */
+    @media screen and (max-width: 768px) {
+      :root {
+        --base-font-size: 16px;
+        --content-max-width: 100%;
+      }
+    }
+
+    /* Copy button styling */
+    .docsify-copy-code-button {
+      font-size: 0.75rem !important;
+      padding: 4px 8px !important;
+      background: #475569 !important;
+      color: #e2e8f0 !important;
+      border-radius: 4px !important;
+    }
+
+    .docsify-copy-code-button:hover {
+      background: #6366f1 !important;
+    }
+
+    /* Smooth scrolling */
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Better cover page */
+    section.cover {
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+    }
+
+    section.cover h1 {
+      font-size: 3rem;
+      font-weight: 800;
     }
   </style>
 </head>
 <body>
-  <div id="app">Loading...</div>
+  <div id="app">Loading documentation...</div>
   <script>
     window.$docsify = {
-      name: 'Alepo Selfcare',
+      name: '<span style="font-weight:700">Alepo Selfcare</span>',
       repo: 'https://github.com/sandeep-patel-alepo-fifth/selfcare-sdui-spike',
       loadSidebar: true,
       subMaxLevel: 3,
       auto2top: true,
+      homepage: 'README.md',
+      notFoundPage: true,
       search: {
-        placeholder: 'Search documentation',
-        noData: 'No results',
-        paths: 'auto'
+        placeholder: 'Search docs...',
+        noData: 'No results found',
+        paths: 'auto',
+        depth: 3
+      },
+      copyCode: {
+        buttonText: 'Copy',
+        successText: 'Copied!'
+      },
+      pagination: {
+        previousText: 'Previous',
+        nextText: 'Next',
+        crossChapter: true,
+        crossChapterText: true
+      },
+      tabs: {
+        persist: true,
+        sync: true
       }
     }
   </script>
+  <!-- Docsify core -->
   <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+
+  <!-- Plugins -->
   <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2/dist/docsify-pagination.min.js"></script>
+
+  <!-- Syntax highlighting -->
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-tsx.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-jsx.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
 </body>
 </html>
