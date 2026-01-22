@@ -1,6 +1,6 @@
-# Selfcare SDUI Spike
+# Alepo Enterprise Selfcare Boilerplate
 
-A Server-Driven UI (SDUI) framework for telecommunications self-care applications. This project demonstrates how to build dynamic, JSON-driven user interfaces that can be updated without client deployments.
+A production-ready boilerplate for Alepo's Enterprise Multitenant Selfcare platform (SelfcareNOW). Built with Next.js 14, React, TypeScript, and a simplified SDUI approach using JSON Forms + MUI.
 
 ## Quick Start
 
@@ -19,26 +19,31 @@ npm run db:generate
 npm run dev
 ```
 
-Visit http://localhost:3000/dashboard to see the demo.
+Visit http://localhost:3000 to see the demo.
 
-## What is SDUI?
+## Architecture
 
-Server-Driven UI is an architectural pattern where the server sends JSON schemas that describe the UI, and the client renders them dynamically. This enables:
+> "Use libraries, don't build frameworks"
 
-- **Instant UI updates** without app releases
-- **A/B testing** with different screen variants
-- **Multi-tenant support** with customized UIs per tenant
-- **Rapid iteration** by product teams
+This boilerplate leverages proven open-source libraries instead of custom implementations:
+
+| Concern | Library | Rationale |
+|---------|---------|-----------|
+| Forms | JSON Forms | Enterprise-grade, schema-driven |
+| UI | MUI (Material UI) | Comprehensive, accessible, themeable |
+| Validation | Zod | Type-safe, composable schemas |
+| State | React Context | Simple, debuggable |
+| Routing | Next.js App Router | Server components, file-based |
 
 ## Tech Stack
 
 | Technology | Purpose |
 |------------|---------|
-| Next.js 15 | React framework with App Router |
-| React 19 | UI rendering |
+| Next.js 14 | React framework with App Router |
+| React 18 | UI rendering |
 | TypeScript | Type safety |
-| Tailwind CSS 4 | Styling |
-| Zustand | State management |
+| MUI | Component library |
+| JSON Forms | Schema-driven forms |
 | Prisma | Database ORM |
 | MongoDB | Database |
 | Zod | Schema validation |
@@ -47,106 +52,89 @@ Server-Driven UI is an architectural pattern where the server sends JSON schemas
 
 ```
 src/
-├── app/                    # Next.js pages and API routes
-├── components/
-│   ├── sdui/              # SDUI framework components
-│   └── ui/                # Reusable UI components
+├── app/                          # Next.js App Router
+│   ├── (auth)/                   # Public auth routes
+│   │   ├── login/
+│   │   ├── register/
+│   │   └── verify-otp/
+│   │
+│   ├── (portal)/                 # Protected customer portal
+│   │   ├── dashboard/
+│   │   ├── billing/
+│   │   ├── usage/
+│   │   ├── plans/
+│   │   ├── profile/
+│   │   └── support/
+│   │
+│   ├── admin/                    # Admin portal
+│   └── api/                      # API routes
+│
 ├── lib/
-│   ├── sdui/              # Core SDUI framework
-│   │   ├── renderer.tsx   # Dynamic component renderer
-│   │   ├── action-dispatcher.ts
-│   │   ├── condition-evaluator.ts
-│   │   ├── data-binding.ts
-│   │   ├── component-registry.tsx
-│   │   └── store.ts       # Zustand state store
-│   └── db/                # Database utilities
-└── types/
-    └── sdui.ts            # TypeScript + Zod schemas
-
-docs/
-└── architecture/          # Detailed documentation
+│   ├── core/                     # Core infrastructure
+│   │   ├── tenant-context.tsx
+│   │   ├── auth-context.tsx
+│   │   └── api-client.ts
+│   │
+│   └── sdui/                     # Simplified SDUI
+│       ├── types.ts
+│       ├── screen-loader.tsx
+│       └── actions.tsx
+│
+├── components/
+│   ├── ui/                       # Base UI components
+│   ├── layout/                   # Layout components
+│   └── selfcare/                 # Feature components
+│       ├── dashboard/
+│       ├── billing/
+│       ├── usage/
+│       └── ...
+│
+├── screens/                      # Screen JSON configs
+│   ├── auth/
+│   ├── dashboard/
+│   └── billing/
+│
+└── types/                        # TypeScript types
 ```
 
-## Architecture Documentation
+## Multi-Tenancy
 
-For detailed documentation, see the [Architecture Guide](./docs/architecture/00-overview.md):
+The platform supports complete tenant isolation with:
 
-| Document | Description |
-|----------|-------------|
-| [00-overview](./docs/architecture/00-overview.md) | Big picture and mental model |
-| [01-getting-started](./docs/architecture/01-getting-started.md) | Setup and first changes |
-| [02-sdui-core](./docs/architecture/02-sdui-core.md) | Renderer, data binding, conditions |
-| [03-actions-system](./docs/architecture/03-actions-system.md) | Action dispatcher and triggers |
-| [04-components](./docs/architecture/04-components.md) | Building and registering components |
-| [05-api-layer](./docs/architecture/05-api-layer.md) | Routes, database, Prisma |
-| [06-state-management](./docs/architecture/06-state-management.md) | Zustand store patterns |
-| [07-extending](./docs/architecture/07-extending.md) | Future features guidance |
-| [08-troubleshooting](./docs/architecture/08-troubleshooting.md) | Common issues and debugging |
-
-## Key Concepts
-
-### Screen Schema
-
-UI screens are defined as JSON:
+- **Tenant Resolution**: Subdomain-based (tenant.selfcare.com) or custom domains
+- **Branding**: Custom logos, colors, themes per tenant
+- **Features**: Feature flags configurable per tenant
+- **Localization**: Date formats, timezones, currencies, RTL support
 
 ```typescript
+// Example tenant configuration
 {
-  version: "1.0",
-  id: "dashboard",
-  type: "screen",
-  components: [
-    {
-      id: "greeting",
-      type: "heading",
-      props: { text: "Hello, {{user.firstName}}!" }
-    }
-  ]
-}
-```
-
-### Template Strings
-
-Dynamic data binding with transforms:
-
-```typescript
-"{{user.balance|currency}}"     // "$125.50"
-"{{user.name|uppercase}}"       // "JOHN DOE"
-"{{user.plan.type|capitalize}}" // "Postpaid"
-```
-
-### Conditional Rendering
-
-Show/hide components based on data:
-
-```typescript
-{
-  type: "alert",
-  props: { title: "Upgrade Available" },
-  conditions: {
-    field: "user.plan.type",
-    operator: "eq",
-    value: "prepaid"
+  id: "tenant-a",
+  name: "TelcoMax",
+  branding: {
+    logo: "/logos/telcomax.svg",
+    primaryColor: "#6366f1",
+    theme: "light"
+  },
+  features: {
+    autopay: true,
+    familyAccounts: true,
+    chatbot: false
   }
 }
 ```
 
-### Declarative Actions
+## Feature Modules
 
-Define what happens on interaction:
-
-```typescript
-{
-  type: "button",
-  props: { text: "View Plans" },
-  actions: [
-    {
-      trigger: "click",
-      type: "navigate",
-      payload: { route: "/plans" }
-    }
-  ]
-}
-```
+| Module | Description |
+|--------|-------------|
+| Dashboard | Account overview, balance, usage charts, activity feed |
+| Billing | Bills, payments, autopay, payment methods |
+| Usage | Usage history, CDR, data passes, services |
+| Plans | Browse plans, plan switching, add-ons |
+| Profile | Account settings, security, preferences |
+| Family | Parent-child hierarchy management |
+| Support | FAQ, tickets, chatbot |
 
 ## Available Scripts
 
@@ -155,22 +143,42 @@ npm run dev        # Start development server
 npm run build      # Build for production
 npm run start      # Start production server
 npm run lint       # Run ESLint
+npm run test       # Run tests
 npm run db:generate # Generate Prisma client
 npm run db:push    # Push schema to database
 npm run db:studio  # Open Prisma Studio
 ```
 
-## Demo Pages
+## Documentation
 
-- `/dashboard` - Main dashboard with usage widgets and quick actions
-- `/onboarding` - Multi-step onboarding flow
+- [Design Document](./docs/plans/2026-01-22-alepo-selfcare-boilerplate-design.md) - Full architecture and implementation details
+- [Requirements](./enterprise-selfcare-requirements.md) - Enterprise requirements specification
+
+### Training Resources (SDUI Concepts)
+
+The `docs/architecture/` folder contains detailed documentation on Server-Driven UI concepts:
+
+| Document | Description |
+|----------|-------------|
+| [00-overview](./docs/architecture/00-overview.md) | SDUI concepts and mental model |
+| [01-getting-started](./docs/architecture/01-getting-started.md) | Setup and first changes |
+| [02-sdui-core](./docs/architecture/02-sdui-core.md) | Renderer, data binding, conditions |
+| [03-actions-system](./docs/architecture/03-actions-system.md) | Action dispatcher and triggers |
+| [04-components](./docs/architecture/04-components.md) | Building and registering components |
+| [05-api-layer](./docs/architecture/05-api-layer.md) | Routes, database, Prisma |
+| [06-state-management](./docs/architecture/06-state-management.md) | State management patterns |
+| [07-extending](./docs/architecture/07-extending.md) | Future features guidance |
+| [08-troubleshooting](./docs/architecture/08-troubleshooting.md) | Common issues and debugging |
+
+> **Note:** These docs describe the original complex SDUI approach. The current boilerplate uses a simplified approach with JSON Forms + MUI. These remain valuable for understanding SDUI concepts.
 
 ## Development Notes
 
-- The app works without a database (falls back to mock screens)
-- Hot reload works for schema changes
-- TypeScript provides full type safety for schemas
+- The app works without a database (falls back to mock data)
+- Hot reload works for all changes
+- TypeScript provides full type safety
+- JSON Forms handles form rendering and validation
 
 ## License
 
-MIT
+Proprietary - Alepo Technologies

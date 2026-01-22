@@ -1,10 +1,10 @@
 # Architecture Overview
 
-This document provides a mental model for understanding the selfcare-sdui-spike project - a Server-Driven UI (SDUI) framework for telecommunications self-care applications.
+This document provides a mental model for understanding the Alepo Enterprise Selfcare Boilerplate - a multi-tenant customer self-service platform built with Next.js, React, and a simplified Server-Driven UI approach.
 
 ## Table of Contents
 
-1. [What is Server-Driven UI?](#what-is-server-driven-ui)
+1. [Philosophy](#philosophy)
 2. [The Big Picture](#the-big-picture)
 3. [Core Concepts](#core-concepts)
 4. [Data Flow](#data-flow)
@@ -14,286 +14,236 @@ This document provides a mental model for understanding the selfcare-sdui-spike 
 
 ---
 
-## What is Server-Driven UI?
+## Philosophy
 
-Server-Driven UI (SDUI) is an architectural pattern where the server controls what the UI displays by sending structured data (usually JSON) that describes the interface. The client interprets this data and renders the appropriate components.
+> "Use libraries, don't build frameworks"
 
-### Traditional vs SDUI Approach
+This boilerplate prioritizes:
 
-**Traditional Approach:**
-```
-Server: "Here's user data: {name: 'John', balance: 100}"
-Client: "I'll render my hardcoded Dashboard component with this data"
-```
-
-**SDUI Approach:**
-```
-Server: "Render a Card with a Heading showing {{user.name}}, then a Text showing {{user.balance|currency}}"
-Client: "I'll interpret this schema and render whatever components you specify"
-```
-
-### Why SDUI?
-
-1. **Instant Updates**: Change the UI without deploying new client code
-2. **A/B Testing**: Serve different screen layouts to different users
-3. **Multi-tenant**: Different customers get different UIs from the same codebase
-4. **Rapid Iteration**: Product teams can modify screens without engineering releases
-5. **Consistency**: Single source of truth for UI across platforms
-
-### The Trade-off
-
-SDUI adds complexity. You're essentially building a mini-framework that interprets schemas. This is worthwhile when:
-- You need frequent UI changes without deployments
-- You support multiple tenants with different requirements
-- You want non-engineers to modify screens
-
-It's overkill when:
-- Your UI rarely changes
-- You have a single tenant
-- You prioritize development speed over flexibility
+1. **Simplicity over flexibility** - Use proven libraries instead of custom implementations
+2. **Server computes, Client renders** - Keep logic on the server, client stays simple
+3. **Convention over configuration** - Sensible defaults, override when needed
+4. **Tenant = Configuration** - Different tenants through config, not code changes
 
 ---
 
 ## The Big Picture
 
-Here's how the system works at a high level:
-
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                           DATABASE                                   │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │ Screens  │  │  Flows   │  │  Themes  │  │ Tenants  │            │
-│  │  (JSON)  │  │  (JSON)  │  │  (JSON)  │  │ (config) │            │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
-└───────┼─────────────┼─────────────┼─────────────┼───────────────────┘
-        │             │             │             │
-        └─────────────┴──────┬──────┴─────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │   API Routes    │
-                    │ /api/screens/x  │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │   ScreenPage    │
-                    │   Component     │
-                    └────────┬────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        │                    │                    │
-┌───────▼───────┐   ┌────────▼────────┐   ┌──────▼──────┐
-│ Zustand Store │   │ Screen Renderer │   │   Context   │
-│  (state mgmt) │   │  (interprets)   │   │ (user data) │
-└───────┬───────┘   └────────┬────────┘   └──────┬──────┘
-        │                    │                   │
-        └────────────────────┼───────────────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │              │              │
-      ┌───────▼───────┐ ┌────▼────┐ ┌──────▼──────┐
-      │  Conditions   │ │  Data   │ │   Actions   │
-      │  Evaluator    │ │ Binding │ │ Dispatcher  │
-      └───────┬───────┘ └────┬────┘ └──────┬──────┘
-              │              │             │
-              └──────────────┼─────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │    Component    │
-                    │    Registry     │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  React Render   │
-                    │   (actual UI)   │
-                    └─────────────────┘
+│                        TENANT LAYER                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
+│  │  Tenant A   │  │  Tenant B   │  │  Tenant C   │                  │
+│  │  - branding │  │  - branding │  │  - branding │                  │
+│  │  - features │  │  - features │  │  - features │                  │
+│  │  - locale   │  │  - locale   │  │  - locale   │                  │
+│  └─────────────┘  └─────────────┘  └─────────────┘                  │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      MIDDLEWARE                                      │
+│  - Resolve tenant from subdomain/domain/header                      │
+│  - Inject tenant context into request                               │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      NEXT.JS APP                                     │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐     │
+│  │   (auth)        │  │   (portal)      │  │    admin        │     │
+│  │   - login       │  │   - dashboard   │  │   - tenants     │     │
+│  │   - register    │  │   - billing     │  │   - plans       │     │
+│  │   - verify-otp  │  │   - usage       │  │   - reports     │     │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘     │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      PROVIDERS                                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
+│  │   Tenant    │  │    Auth     │  │    MUI      │                  │
+│  │   Context   │  │   Context   │  │   Theme     │                  │
+│  └─────────────┘  └─────────────┘  └─────────────┘                  │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      UI COMPONENTS                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
+│  │  JSON Forms │  │  MUI        │  │  Custom     │                  │
+│  │  (forms)    │  │  (UI kit)   │  │  (selfcare) │                  │
+│  └─────────────┘  └─────────────┘  └─────────────┘                  │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### The Flow in Words
 
-1. **User visits a page** (e.g., `/dashboard`)
-2. **Page component requests screen schema** from API
-3. **API returns JSON schema** describing the UI structure
-4. **ScreenRenderer processes the schema:**
-   - Evaluates conditions (should this component render?)
-   - Resolves data bindings (replace `{{user.name}}` with "John")
-   - Creates action handlers (what happens on click?)
-5. **Component Registry maps types to React components**
-6. **React renders the actual UI**
-7. **User interacts** → Actions fire → State updates → Re-render
+1. **User visits a page** (e.g., `tenant-a.selfcare.com/dashboard`)
+2. **Middleware resolves tenant** from subdomain/domain
+3. **Tenant config is loaded** (branding, features, integrations)
+4. **Page renders with tenant context** (themed UI, enabled features)
+5. **Forms use JSON Forms** with JSON Schema for validation
+6. **API calls include tenant ID** for data isolation
 
 ---
 
 ## Core Concepts
 
-### 1. Screen Schema
+### 1. Multi-Tenancy
 
-A Screen is a JSON document that describes a page's UI:
+Every request is scoped to a tenant. Tenant resolution order:
+
+1. Subdomain: `tenant-a.selfcare.com` → `tenant-a`
+2. Custom domain: `www.telcomax.com` → lookup in config
+3. Header: `X-Tenant-ID: tenant-a`
+4. Default: `demo` (development only)
 
 ```typescript
-{
-  version: "1.0",
-  id: "dashboard",
-  type: "screen",
-  meta: { title: "Dashboard", requiresAuth: true },
-  layout: { type: "grid", columns: 12, gap: 8 },
-  components: [
-    // Array of component nodes (the actual UI structure)
-  ],
-  initialState: { showModal: false }
+// Tenant configuration
+interface TenantConfig {
+  id: string;
+  name: string;
+  branding: {
+    logo: string;
+    primaryColor: string;
+    theme: 'light' | 'dark' | 'auto';
+  };
+  features: {
+    autopay: boolean;
+    familyAccounts: boolean;
+    chatbot: boolean;
+    // ...
+  };
+  localization: {
+    dateFormat: string;
+    timezone: string;
+    currency: string;
+  };
+  integrations: {
+    crm: { baseUrl: string; clientId: string };
+    billing: { baseUrl: string };
+    payment: { stripe?: {...}; cashApp?: {...} };
+  };
 }
 ```
 
-### 2. Component Node
+### 2. Simplified SDUI
 
-Each component in the tree is a node with this structure:
+Instead of complex client-side expression evaluation, we use:
+
+- **JSON Forms** for form rendering with JSON Schema
+- **MUI** for UI components
+- **Server-side resolution** for dynamic data
+- **Named actions** instead of inline logic
 
 ```typescript
-{
-  id: "greeting",           // Unique identifier
-  type: "heading",          // Component type (maps to registry)
-  props: {                  // Props passed to the component
-    text: "Hello, {{user.firstName}}",
-    level: 2
-  },
-  className: "mb-4",        // CSS classes
-  conditions: {...},        // When to render
-  actions: [...],           // What happens on interaction
-  dataBinding: {...},       // Dynamic data sources
-  children: [...]           // Nested components
+// Screen configuration
+interface ScreenConfig {
+  id: string;
+  type: 'form' | 'layout' | 'dashboard';
+  title: string;
+
+  // For form screens - uses JSON Forms
+  form?: {
+    schema: JsonSchema;      // JSON Schema for validation
+    uiSchema?: UISchema;     // Layout hints for JSON Forms
+    initialData?: object;
+  };
+
+  // For layout screens - component composition
+  layout?: {
+    components: ComponentConfig[];
+  };
+
+  // Named actions
+  actions?: Record<string, ActionConfig>;
 }
 ```
 
-### 3. Data Binding
+### 3. Feature Flags
 
-Data binding connects component props to runtime data:
+Features are toggled per tenant:
 
 ```typescript
-// Template strings - inline in props
-props: { text: "Balance: {{user.balance|currency}}" }
+// Check feature availability
+const { features } = useTenant();
 
-// Data binding objects - more control
-dataBinding: {
-  value: {
-    source: "form",        // context | state | form | api
-    path: "email",         // dot notation path
-    transform: "lowercase", // optional transform
-    fallback: ""           // default value
-  }
+if (features.autopay) {
+  // Show autopay option
 }
+
+// Or use the hook
+const canUseAutopay = useFeature('autopay');
 ```
 
-### 4. Conditions
+### 4. Authentication
 
-Conditions control when components render:
-
-```typescript
-// Simple condition
-conditions: {
-  field: "user.plan.type",
-  operator: "eq",
-  value: "postpaid"
-}
-
-// Complex conditions (AND/OR groups)
-conditions: {
-  operator: "and",
-  conditions: [
-    { field: "user.isVerified", operator: "eq", value: true },
-    { field: "user.balance", operator: "gt", value: 0 }
-  ]
-}
-```
-
-### 5. Actions
-
-Actions define what happens when users interact:
+OAuth 2.0 + JWT with MFA support:
 
 ```typescript
-actions: [
-  {
-    trigger: "click",       // click | submit | change | blur | focus
-    type: "navigate",       // Action type
-    payload: { route: "/plans" },
-    condition: {...},       // Optional: only fire if condition met
-    onSuccess: [...],       // Actions to run on success
-    onError: [...]          // Actions to run on error
-  }
-]
-```
-
-### 6. Flows
-
-Flows are multi-step processes (like onboarding):
-
-```typescript
-{
-  id: "onboarding",
-  type: "flow",
-  steps: [
-    { id: "welcome", screenId: "onboarding-welcome" },
-    { id: "register", screenId: "onboarding-registration" },
-    { id: "plan", screenId: "onboarding-plan-selection" }
-  ],
-  onComplete: [{ type: "navigate", payload: { route: "/dashboard" }}]
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  accessToken: string | null;
 }
+
+// Auth flow
+1. User submits phone + password
+2. Server validates with CRM OAuth
+3. If MFA required, redirect to OTP
+4. On success, receive JWT tokens
+5. Tokens stored in context, sent with requests
 ```
 
 ---
 
 ## Data Flow
 
-Understanding data flow is crucial. Here's what happens for a single component:
+### Form Submission Flow
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    RENDERING PIPELINE                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  1. CONDITION CHECK                                          │
-│     ┌─────────────┐     ┌──────────────────┐                │
-│     │ conditions  │ ──▶ │ evaluateConditions│ ──▶ render?   │
-│     └─────────────┘     └──────────────────┘                │
-│                                                              │
-│  2. DATA BINDING                                             │
-│     ┌─────────────┐     ┌──────────────────┐                │
-│     │ dataBinding │ ──▶ │ resolveBindings  │ ──▶ values     │
-│     └─────────────┘     └──────────────────┘                │
-│                                                              │
-│  3. TEMPLATE RESOLUTION                                      │
-│     ┌─────────────┐     ┌──────────────────┐                │
-│     │   props     │ ──▶ │ resolveTemplates │ ──▶ props      │
-│     └─────────────┘     └──────────────────┘                │
-│                                                              │
-│  4. ACTION HANDLERS                                          │
-│     ┌─────────────┐     ┌──────────────────┐                │
-│     │  actions    │ ──▶ │ createHandlers   │ ──▶ onClick,   │
-│     └─────────────┘     └──────────────────┘     onChange   │
-│                                                              │
-│  5. COMPONENT LOOKUP                                         │
-│     ┌─────────────┐     ┌──────────────────┐                │
-│     │    type     │ ──▶ │ getComponent     │ ──▶ Component  │
-│     └─────────────┘     └──────────────────┘                │
-│                                                              │
-│  6. RENDER                                                   │
-│     ┌─────────────────────────────────────────────┐         │
-│     │ <Component {...props} {...handlers}>        │         │
-│     │   {children.map(child => render(child))}    │         │
-│     │ </Component>                                 │         │
-│     └─────────────────────────────────────────────┘         │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     FORM SUBMISSION                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. USER INPUT                                                   │
+│     ┌─────────────┐                                             │
+│     │ JSON Forms  │ ──▶ Schema validation (client-side)         │
+│     └─────────────┘                                             │
+│                                                                  │
+│  2. SUBMIT ACTION                                                │
+│     ┌─────────────┐     ┌──────────────────┐                    │
+│     │   onSubmit  │ ──▶ │ executeAction()  │                    │
+│     └─────────────┘     └──────────────────┘                    │
+│                                                                  │
+│  3. API CALL                                                     │
+│     ┌─────────────┐     ┌──────────────────┐                    │
+│     │  API Client │ ──▶ │ POST /api/...    │                    │
+│     │ + Tenant ID │     │ + Auth token     │                    │
+│     └─────────────┘     └──────────────────┘                    │
+│                                                                  │
+│  4. RESPONSE                                                     │
+│     ┌─────────────────────────────────────────────┐             │
+│     │ { success, data, errors, navigate, toast }  │             │
+│     └─────────────────────────────────────────────┘             │
+│                                                                  │
+│  5. UI UPDATE                                                    │
+│     - Show errors on fields                                     │
+│     - Navigate to next screen                                   │
+│     - Show toast notification                                   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Context Sources
 
-Data comes from four sources:
-
-| Source | Description | Example Path |
-|--------|-------------|--------------|
-| `context` | User/tenant data | `user.firstName`, `tenant.name` |
-| `state` | Persistent + screen state | `state.selectedPlan` |
-| `form` | Form field values | `form.email`, `form.phone` |
-| `api` | API response data | `api.plans`, `api.result` |
+| Source | Description | Example |
+|--------|-------------|---------|
+| `tenant` | Tenant configuration | `tenant.branding.primaryColor` |
+| `user` | Authenticated user | `user.firstName`, `user.accountType` |
+| `form` | Form field values | `form.email`, `form.amount` |
+| `api` | API response data | `api.balance`, `api.plans` |
 
 ---
 
@@ -301,14 +251,15 @@ Data comes from four sources:
 
 | Technology | Purpose | Why Chosen |
 |------------|---------|------------|
-| **Next.js 15** | React framework | App router, API routes, server components |
-| **React 19** | UI library | Latest features, concurrent rendering |
+| **Next.js 14** | React framework | App router, server components, middleware |
+| **React 18** | UI library | Hooks, concurrent features |
 | **TypeScript** | Type safety | Catch errors early, better DX |
-| **Tailwind CSS 4** | Styling | Utility-first, fast prototyping |
-| **Zustand** | State management | Simple, lightweight, no boilerplate |
-| **Prisma** | Database ORM | Type-safe queries, great DX |
-| **MongoDB** | Database | Flexible JSON storage for schemas |
-| **Zod** | Validation | Runtime type checking, schema validation |
+| **MUI** | Component library | Comprehensive, accessible, themeable |
+| **JSON Forms** | Form rendering | Schema-driven, validation included |
+| **Zod** | Validation | Type-safe runtime validation |
+| **React Context** | State management | Simple, no extra dependencies |
+| **Prisma** | Database ORM | Type-safe queries, migrations |
+| **MongoDB** | Database | Flexible documents, tenant isolation |
 
 ---
 
@@ -316,119 +267,107 @@ Data comes from four sources:
 
 ```
 src/
-├── app/                      # Next.js app router
-│   ├── api/                  # API routes
-│   │   ├── screens/[screenId]/  # GET screen by ID
-│   │   └── schemas/          # CRUD for schemas
-│   ├── dashboard/            # Dashboard page
-│   ├── onboarding/           # Onboarding flow page
-│   └── admin/                # Admin panel
-│
-├── components/
-│   ├── sdui/                 # SDUI-specific components
-│   │   └── screen-page.tsx   # Screen rendering wrapper
-│   └── ui/                   # Reusable UI components
-│       ├── button.tsx
-│       ├── card.tsx
-│       └── ...
+├── app/                          # Next.js App Router
+│   ├── (auth)/                   # Public auth routes (login, register, etc.)
+│   ├── (portal)/                 # Protected portal routes
+│   ├── admin/                    # Admin portal
+│   └── api/                      # API routes
 │
 ├── lib/
-│   ├── sdui/                 # SDUI Framework Core
-│   │   ├── renderer.tsx      # Dynamic component renderer
-│   │   ├── component-registry.tsx  # Type-to-component mapping
-│   │   ├── action-dispatcher.ts    # Action execution
-│   │   ├── condition-evaluator.ts  # Condition logic
-│   │   ├── data-binding.ts   # Template resolution
-│   │   ├── store.ts          # Zustand state store
-│   │   └── schemas/          # Mock screen definitions
-│   ├── db/
-│   │   └── prisma.ts         # Prisma client
-│   └── utils/
-│       └── cn.ts             # Class name utility
+│   ├── core/                     # Core infrastructure
+│   │   ├── tenant-context.tsx    # Tenant provider & hooks
+│   │   ├── auth-context.tsx      # Auth provider & hooks
+│   │   └── api-client.ts         # Typed API client
+│   │
+│   ├── sdui/                     # Simplified SDUI
+│   │   ├── types.ts              # Screen, component, action types
+│   │   ├── screen-loader.tsx     # Screen rendering
+│   │   └── actions.ts            # Action execution
+│   │
+│   └── utils/                    # Utilities
+│       ├── format.ts             # Date, currency formatters
+│       └── validation.ts         # Zod schemas
 │
-├── types/
-│   └── sdui.ts               # TypeScript + Zod schemas
+├── components/
+│   ├── ui/                       # Base UI components
+│   ├── layout/                   # Layout components
+│   └── selfcare/                 # Feature-specific components
+│       ├── dashboard/            # Dashboard widgets
+│       ├── billing/              # Billing components
+│       ├── usage/                # Usage components
+│       └── ...
 │
-prisma/
-└── schema.prisma             # Database models
+├── screens/                      # Screen JSON configurations
+│   ├── auth/
+│   ├── dashboard/
+│   └── billing/
+│
+├── types/                        # TypeScript types
+│   ├── tenant.ts
+│   ├── user.ts
+│   └── api.ts
+│
+└── styles/
+    └── theme.ts                  # MUI theme configuration
+
+config/
+└── tenants/                      # Tenant configuration files
+    ├── default.json
+    └── demo.json
 ```
 
 ---
 
 ## Key Design Decisions
 
-### Why Zustand over Redux?
+### Why JSON Forms over Custom SDUI?
 
-Zustand was chosen for its simplicity. Compare:
+| Aspect | Custom SDUI | JSON Forms |
+|--------|-------------|------------|
+| Form validation | Build it yourself | Built-in with JSON Schema |
+| Accessibility | Manual implementation | WCAG compliant out of box |
+| Maintenance | High (custom code) | Low (library updates) |
+| Learning curve | High (proprietary) | Medium (standard specs) |
+| Flexibility | Maximum | High (custom renderers) |
 
-```typescript
-// Zustand - minimal boilerplate
-const useStore = create((set) => ({
-  count: 0,
-  increment: () => set((state) => ({ count: state.count + 1 }))
-}));
+JSON Forms gives us 80% of what we need with 20% of the effort.
 
-// Redux - more ceremony
-// actions.ts, reducers.ts, store.ts, selectors.ts...
-```
+### Why MUI over Custom Components?
 
-For this project's needs (screen state, form state, modal state), Zustand provides enough power without the complexity.
+- **Comprehensive**: 50+ production-ready components
+- **Accessible**: WCAG 2.1 compliant
+- **Themeable**: Easy tenant branding with `createTheme()`
+- **Maintained**: Large community, regular updates
 
-### Why MongoDB?
+### Why React Context over Zustand/Redux?
 
-Screen schemas are JSON documents. MongoDB stores JSON natively, making it natural to:
-- Store complete screen schemas as documents
-- Query by tenant, tags, or any field
-- Support schema evolution without migrations
+For this application's needs (tenant config, auth state, simple UI state), React Context provides:
 
-Relational databases would work, but you'd serialize/deserialize JSON constantly.
+- No extra dependencies
+- Simpler mental model
+- Sufficient performance
+- Built-in React DevTools support
 
-### Why Template Strings AND Data Binding?
+### Why Server-Side Resolution?
 
-Both exist because they serve different needs:
+Moving logic to the server:
 
-**Template strings** are simple and readable:
-```typescript
-text: "Hello, {{user.firstName}}!"
-```
-
-**Data binding** offers more control:
-```typescript
-dataBinding: {
-  userName: {
-    source: "context",
-    path: "user.firstName",
-    transform: "uppercase",
-    fallback: "Guest"
-  }
-}
-```
-
-Use template strings for simple cases, data binding when you need transforms or fallbacks.
-
-### Why Safe Expression Evaluation?
-
-The `data-binding.ts` file includes a custom safe expression parser instead of using JavaScript's built-in code execution methods. This custom parser:
-
-- Parses arithmetic: `{{state.count + 1}}`
-- Parses ternaries: `{{user.isActive ? 'Active' : 'Inactive'}}`
-- Parses comparisons: `{{user.balance > 100}}`
-
-The custom parser prevents code injection vulnerabilities while still allowing useful expressions. See `safeEvaluateExpression()` in `data-binding.ts` for the implementation.
+- **Simpler client**: No expression evaluation, just render
+- **More secure**: Business logic not exposed to client
+- **Easier debugging**: Server logs vs browser console
+- **Better caching**: Resolved screens can be cached
 
 ---
 
 ## Next Steps
 
-Now that you understand the big picture:
-
 1. **[Getting Started](./01-getting-started.md)** - Set up your development environment
-2. **[SDUI Core](./02-sdui-core.md)** - Deep dive into the renderer
+2. **[SDUI Core](./02-sdui-core.md)** - Screen loading and JSON Forms
 3. **[Actions System](./03-actions-system.md)** - How actions work
-4. **[Components](./04-components.md)** - Building new components
-5. **[API Layer](./05-api-layer.md)** - Backend and database
-6. **[State Management](./06-state-management.md)** - Zustand patterns
-7. **[Extending](./07-extending.md)** - Future features
+4. **[Components](./04-components.md)** - MUI and custom components
+5. **[API Layer](./05-api-layer.md)** - Backend and integrations
+6. **[State Management](./06-state-management.md)** - Context patterns
+7. **[Extending](./07-extending.md)** - Adding features
 8. **[Troubleshooting](./08-troubleshooting.md)** - Common issues
 
 ---
@@ -439,21 +378,20 @@ Now that you understand the big picture:
 
 | What | Where |
 |------|-------|
-| Add a new screen | `src/lib/sdui/schemas/` or database |
-| Add a new component | `src/components/ui/` + register in `component-registry.tsx` |
-| Add a new action type | `src/lib/sdui/action-dispatcher.ts` |
-| Add a new transform | `src/lib/sdui/data-binding.ts` |
-| Add a new condition operator | `src/lib/sdui/condition-evaluator.ts` |
-| Add a new API route | `src/app/api/` |
-| Modify state structure | `src/lib/sdui/store.ts` |
-| Add new types | `src/types/sdui.ts` |
+| Add a tenant config | `config/tenants/[tenant-id].json` |
+| Add a screen | `src/screens/[module]/[screen].json` |
+| Add a component | `src/components/selfcare/[module]/` |
+| Add an API route | `src/app/api/[module]/route.ts` |
+| Add types | `src/types/` |
+| Modify tenant context | `src/lib/core/tenant-context.tsx` |
+| Modify auth flow | `src/lib/core/auth-context.tsx` |
 
 ### Common Tasks
 
 | Task | Steps |
 |------|-------|
-| Create a new page | 1. Create screen schema, 2. Add to mock screens or DB, 3. Create page component using `ScreenPage` |
-| Add form validation | Add `validation` array to input component nodes |
-| Show/hide based on data | Add `conditions` to component node |
-| Navigate on click | Add action with `type: "navigate"` |
-| Call API on click | Add action with `type: "apiCall"` |
+| Add new tenant | Create config in `config/tenants/`, set branding and features |
+| Add new page | Create route in `src/app/`, create screen config if using SDUI |
+| Add form | Define JSON Schema, create screen config, add API endpoint |
+| Enable feature | Set `features.[name]: true` in tenant config |
+| Customize theme | Update `branding` in tenant config, MUI theme auto-updates |

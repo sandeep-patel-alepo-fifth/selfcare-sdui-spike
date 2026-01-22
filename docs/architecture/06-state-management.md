@@ -1,508 +1,326 @@
-# State Management with Zustand
+# State Management with React Context
 
-This document covers the state management layer - how the Zustand store works and best practices for managing state in the SDUI framework.
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Store Structure](#store-structure)
-3. [State Types](#state-types)
-4. [Using the Store](#using-the-store)
-5. [Form State](#form-state)
-6. [Flow State](#flow-state)
-7. [Best Practices](#best-practices)
-8. [Exercises](#exercises)
-
----
+This document covers state management using React Context - the simple, built-in approach we use for tenant config, auth state, and UI state.
 
 ## Overview
 
-**File:** `src/lib/sdui/store.ts`
+We use React Context instead of external state libraries because:
 
-The SDUI framework uses Zustand for state management. Zustand was chosen for:
+- **Simplicity**: No extra dependencies
+- **Sufficiency**: Our state needs are straightforward
+- **Built-in**: React DevTools support out of the box
+- **SSR-friendly**: Works well with Next.js
 
-- **Simplicity**: No boilerplate (unlike Redux)
-- **Performance**: Fine-grained subscriptions
-- **Flexibility**: Works outside React components
-- **Size**: Tiny bundle footprint
+---
 
-### The Store at a Glance
+## Context Architecture
 
-```typescript
-const useSDUIStore = create<SDUIStore>((set, get) => ({
-  // Application context (user, tenant)
-  context: { user: mockUser, tenant: mockTenant },
-  setContext: (ctx) => set((s) => ({ context: { ...s.context, ...ctx } })),
-
-  // Screen-local state (resets on navigation)
-  screenState: {},
-  setScreenState: (updates) => set((s) => ({ screenState: { ...s.screenState, ...updates } })),
-
-  // Persistent state (survives navigation)
-  state: {},
-  setState: (updates) => set((s) => ({ state: { ...s.state, ...updates } })),
-
-  // Form state
-  formState: { values: {}, errors: {}, touched: {} },
-  setFormValue: (field, value) => { /* ... */ },
-
-  // Flow state
-  currentFlow: null,
-  currentStep: 0,
-  nextStep: () => { /* ... */ },
-
-  // Modal state
-  activeModals: [],
-  openModal: (id, data) => { /* ... */ },
-
-  // Loading state
-  isLoading: false,
-  setLoading: (loading) => set({ isLoading: loading }),
-}));
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       CONTEXT PROVIDERS                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  TenantProvider                                          │   │
+│  │  - tenant config                                         │   │
+│  │  - branding                                              │   │
+│  │  - features                                              │   │
+│  │  - localization                                          │   │
+│  │                                                          │   │
+│  │  ┌───────────────────────────────────────────────────┐  │   │
+│  │  │  AuthProvider                                      │  │   │
+│  │  │  - user                                            │  │   │
+│  │  │  - tokens                                          │  │   │
+│  │  │  - login/logout methods                            │  │   │
+│  │  │                                                    │  │   │
+│  │  │  ┌─────────────────────────────────────────────┐  │  │   │
+│  │  │  │  ThemeProvider (MUI)                        │  │  │   │
+│  │  │  │  - derived from tenant branding             │  │  │   │
+│  │  │  │                                             │  │  │   │
+│  │  │  │  [Application Components]                   │  │  │   │
+│  │  │  │                                             │  │  │   │
+│  │  │  └─────────────────────────────────────────────┘  │  │   │
+│  │  └───────────────────────────────────────────────────┘  │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Store Structure
-
-### State Categories
-
-The store manages five categories of state:
-
-| Category | Persists? | Purpose |
-|----------|-----------|---------|
-| `context` | Session | User data, tenant config |
-| `state` | Across screens | Persistent app state |
-| `screenState` | Current screen only | Screen-local state |
-| `formState` | Current form | Form values and errors |
-| `apiData` | Until cleared | API response cache |
-
-### Visual Hierarchy
-
-```
-SDUIStore
-├── context          # Read-mostly user/tenant data
-│   ├── user
-│   └── tenant
-│
-├── state            # Persistent state across screens
-│   └── {...}        # Any app-wide state
-│
-├── screenState      # Resets on screen change
-│   └── {...}        # Screen-specific state
-│
-├── formState        # Form management
-│   ├── values       # Field values
-│   ├── errors       # Validation errors
-│   └── touched      # Which fields were touched
-│
-├── apiData          # API response cache
-│   └── {...}        # Keyed by resultKey
-│
-├── currentFlow      # Multi-step flow data
-├── currentStep      # Current step index
-│
-├── activeModals[]   # Modal stack
-│
-└── screens{}        # Screen cache
-```
-
----
-
-## State Types
-
-### Context State
-
-User and tenant data that rarely changes:
+## Tenant Context
 
 ```typescript
-interface SDUIContextData {
-  user?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    plan?: {
-      type: "prepaid" | "postpaid";
-      name: string;
-      price: number;
-    };
-    usage?: {
-      data: { used: number; total: number; unit: string };
-      voice: { used: number; total: number; unit: string };
-      sms: { used: number; total: number; unit: string };
-    };
-    balance?: number;
-  };
-  tenant?: {
-    id: string;
-    name: string;
-    logo?: string;
-    theme?: string;
-  };
-  [key: string]: unknown;  // Extensible
-}
-```
+// lib/core/tenant-context.tsx
+'use client';
 
-**Usage:**
-```typescript
-// In component
-const { context, setContext } = useSDUIStore();
+import { createContext, useContext, ReactNode } from 'react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import type { TenantConfig } from '@/types/tenant';
 
-// In schema
-props: {
-  text: "Hello, {{user.firstName}}!"
-}
-```
+const TenantContext = createContext<TenantConfig | null>(null);
 
-### Screen State vs Persistent State
+export function TenantProvider({
+  tenant,
+  children,
+}: {
+  tenant: TenantConfig;
+  children: ReactNode;
+}) {
+  // Create MUI theme from tenant branding
+  const theme = createTheme({
+    palette: {
+      mode: tenant.branding.theme === 'auto' ? 'light' : tenant.branding.theme,
+      primary: {
+        main: tenant.branding.primaryColor,
+      },
+      secondary: {
+        main: tenant.branding.secondaryColor || tenant.branding.primaryColor,
+      },
+    },
+    direction: tenant.localization.rtl ? 'rtl' : 'ltr',
+  });
 
-**Screen State** - Resets when navigating:
-```typescript
-// Good for: tabs, toggles, temporary UI state
-screenState: {
-  activeTab: "overview",
-  showFilters: false,
-  sortOrder: "desc"
-}
-```
-
-**Persistent State** - Survives navigation:
-```typescript
-// Good for: user preferences, flow data, selected items
-state: {
-  selectedPlanId: "plan-123",
-  onboardingData: { step1: {...}, step2: {...} },
-  recentSearches: ["data", "billing"]
-}
-```
-
-### Form State
-
-```typescript
-interface SDUIFormState {
-  values: Record<string, unknown>;  // { email: "...", phone: "..." }
-  errors: Record<string, string>;   // { email: "Invalid email" }
-  touched: Record<string, boolean>; // { email: true, phone: false }
-}
-```
-
----
-
-## Using the Store
-
-### In React Components
-
-```typescript
-"use client";
-
-import { useSDUIStore } from "@/lib/sdui/store";
-
-function MyComponent() {
-  // Select specific state
-  const user = useSDUIStore((state) => state.context.user);
-  const setScreenState = useSDUIStore((state) => state.setScreenState);
-
-  // Use in component
   return (
-    <div>
-      <p>Hello, {user?.firstName}</p>
-      <button onClick={() => setScreenState({ showModal: true })}>
-        Open Modal
-      </button>
-    </div>
+    <TenantContext.Provider value={tenant}>
+      <ThemeProvider theme={theme}>
+        {children}
+      </ThemeProvider>
+    </TenantContext.Provider>
+  );
+}
+
+export function useTenant(): TenantConfig {
+  const tenant = useContext(TenantContext);
+  if (!tenant) {
+    throw new Error('useTenant must be used within TenantProvider');
+  }
+  return tenant;
+}
+
+export function useFeature(feature: keyof TenantConfig['features']): boolean {
+  const tenant = useTenant();
+  return tenant.features[feature] ?? false;
+}
+```
+
+### Usage
+
+```tsx
+function Dashboard() {
+  const tenant = useTenant();
+  const hasAutopay = useFeature('autopay');
+
+  return (
+    <Box>
+      <Typography>Welcome to {tenant.name}</Typography>
+      {hasAutopay && <AutopayWidget />}
+    </Box>
   );
 }
 ```
 
-### Selective Subscriptions
+---
 
-Zustand re-renders only when selected state changes:
+## Auth Context
 
 ```typescript
-// Good - only re-renders when user changes
-const user = useSDUIStore((state) => state.context.user);
+// lib/core/auth-context.tsx
+'use client';
 
-// Bad - re-renders on ANY state change
-const store = useSDUIStore();
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import type { User } from '@/types/user';
+import { useTenant } from './tenant-context';
+
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  accessToken: string | null;
+}
+
+interface AuthContextValue extends AuthState {
+  login: (phone: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  verifyOtp: (otp: string) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const tenant = useTenant();
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+    accessToken: null,
+  });
+
+  const login = useCallback(async (phone: string, password: string) => {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': tenant.id,
+      },
+      body: JSON.stringify({ phone, password }),
+    });
+
+    const data = await response.json();
+
+    if (data.requiresMfa) {
+      sessionStorage.setItem('pendingAuth', JSON.stringify(data));
+      router.push('/verify-otp');
+      return;
+    }
+
+    setState({
+      user: data.user,
+      isAuthenticated: true,
+      isLoading: false,
+      accessToken: data.accessToken,
+    });
+
+    router.push('/dashboard');
+  }, [tenant.id, router]);
+
+  const logout = useCallback(async () => {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'X-Tenant-ID': tenant.id },
+    });
+
+    setState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      accessToken: null,
+    });
+
+    router.push('/login');
+  }, [tenant.id, router]);
+
+  const verifyOtp = useCallback(async (otp: string) => {
+    const pending = sessionStorage.getItem('pendingAuth');
+    if (!pending) throw new Error('No pending auth');
+
+    const { sessionId } = JSON.parse(pending);
+
+    const response = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': tenant.id,
+      },
+      body: JSON.stringify({ sessionId, otp }),
+    });
+
+    const data = await response.json();
+    sessionStorage.removeItem('pendingAuth');
+
+    setState({
+      user: data.user,
+      isAuthenticated: true,
+      isLoading: false,
+      accessToken: data.accessToken,
+    });
+
+    router.push('/dashboard');
+  }, [tenant.id, router]);
+
+  return (
+    <AuthContext.Provider value={{ ...state, login, logout, verifyOtp }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextValue {
+  const auth = useContext(AuthContext);
+  if (!auth) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return auth;
+}
 ```
 
-### Multiple Selections
+### Usage
 
-```typescript
-// Select multiple values
-const { user, tenant } = useSDUIStore((state) => ({
-  user: state.context.user,
-  tenant: state.context.tenant,
-}));
+```tsx
+function Header() {
+  const { user, logout } = useAuth();
 
-// Or use shallow comparison for objects
-import { shallow } from "zustand/shallow";
-
-const { user, tenant } = useSDUIStore(
-  (state) => ({ user: state.context.user, tenant: state.context.tenant }),
-  shallow
-);
-```
-
-### Outside React Components
-
-```typescript
-// Get current state
-const currentUser = useSDUIStore.getState().context.user;
-
-// Update state
-useSDUIStore.getState().setScreenState({ loading: true });
-
-// Subscribe to changes
-const unsubscribe = useSDUIStore.subscribe(
-  (state) => state.context.user,
-  (user) => console.log("User changed:", user)
-);
+  return (
+    <AppBar>
+      <Toolbar>
+        <Typography>Hello, {user?.firstName}</Typography>
+        <Button onClick={logout}>Logout</Button>
+      </Toolbar>
+    </AppBar>
+  );
+}
 ```
 
 ---
 
-## Form State
+## Local Component State
 
-### How Form State Works
+For component-specific state, use React's built-in hooks:
 
-The renderer automatically wires input components to form state:
+```tsx
+function PaymentForm() {
+  // Local form state
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-```typescript
-// In renderer.tsx
-const inputProps = useMemo(() => {
-  if (!["input", "select", "checkbox"].includes(node.type)) return {};
-
-  const fieldName = node.props?.name || node.id;
-  return {
-    value: formState.values[fieldName] ?? "",
-    error: formState.errors[fieldName],
-    onChange: (e) => setFormValue(fieldName, e.target.value),
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await processPayment(amount);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
-}, [node, formState]);
-```
 
-### Form Actions
-
-**Set a single field:**
-```typescript
-setFormValue("email", "user@example.com");
-```
-
-**Set multiple fields:**
-```typescript
-setFormValues({
-  email: "user@example.com",
-  phone: "555-1234"
-});
-```
-
-**Set an error:**
-```typescript
-setFormError("email", "Invalid email format");
-```
-
-**Mark as touched:**
-```typescript
-setFormTouched("email");
-```
-
-**Reset form:**
-```typescript
-resetForm();  // Clears values, errors, and touched
-```
-
-### Form State in Schemas
-
-Actions can access and modify form state:
-
-```typescript
-// Access form value in action
-actions: [
-  {
-    trigger: "click",
-    type: "apiCall",
-    payload: {
-      endpoint: "/api/register",
-      body: {
-        email: "{{form.email}}",
-        phone: "{{form.phone}}"
-      }
-    }
-  }
-]
-
-// Update form field via action
-actions: [
-  {
-    trigger: "click",
-    type: "setField",
-    payload: {
-      field: "country",
-      value: "US"
-    }
-  }
-]
-```
-
----
-
-## Flow State
-
-For multi-step processes like onboarding.
-
-### Flow Structure
-
-```typescript
-interface Flow {
-  id: string;
-  steps: FlowStep[];
-  initialStep?: string;
-  onComplete?: Action[];
-}
-
-interface FlowStep {
-  id: string;
-  screenId: string;
-  title?: string;
-  conditions?: RenderCondition;
-  onEnter?: Action[];
-  onExit?: Action[];
-}
-```
-
-### Flow Actions
-
-```typescript
-// Start a flow
-setCurrentFlow(onboardingFlow);
-
-// Navigate steps
-nextStep();     // currentStep + 1
-prevStep();     // currentStep - 1
-setCurrentStep(2);  // Go to specific step
-
-// End flow
-setCurrentFlow(null);
-```
-
-### Flow in Schemas
-
-```typescript
-// Next step button
-{
-  type: "button",
-  props: { text: "Continue" },
-  actions: [
-    { trigger: "click", type: "nextStep" }
-  ]
-}
-
-// Previous step button
-{
-  type: "button",
-  props: { text: "Back" },
-  actions: [
-    { trigger: "click", type: "prevStep" }
-  ]
-}
-
-// Skip to specific step
-{
-  type: "button",
-  props: { text: "Skip to Review" },
-  actions: [
-    { trigger: "click", type: "goToStep", payload: { step: 3 } }
-  ]
-}
-```
-
-### Storing Flow Data
-
-Use persistent state to store data across flow steps:
-
-```typescript
-// Step 1: Store personal info
-actions: [
-  {
-    trigger: "click",
-    type: "setPersistentState",
-    payload: {
-      onboardingData: {
-        ...state.onboardingData,
-        personalInfo: {
-          firstName: "{{form.firstName}}",
-          lastName: "{{form.lastName}}"
-        }
-      }
-    }
-  },
-  { trigger: "click", type: "nextStep" }
-]
-
-// Step 3: Access all collected data
-props: {
-  firstName: "{{state.onboardingData.personalInfo.firstName}}",
-  planId: "{{state.onboardingData.selectedPlan.id}}"
+  return (
+    <form onSubmit={handleSubmit}>
+      <TextField value={amount} onChange={(e) => setAmount(e.target.value)} />
+      {error && <Alert severity="error">{error}</Alert>}
+      <Button type="submit" loading={loading}>Pay</Button>
+    </form>
+  );
 }
 ```
 
 ---
 
-## Modal State
+## Provider Setup
 
-### Modal Stack
+```tsx
+// app/layout.tsx
+import { TenantProvider } from '@/lib/core/tenant-context';
+import { AuthProvider } from '@/lib/core/auth-context';
 
-Modals are managed as a stack (LIFO):
+export default async function RootLayout({ children }) {
+  const tenant = await loadTenantFromRequest();
 
-```typescript
-activeModals: [
-  { id: "confirm-dialog", data: { title: "Confirm?" } },
-  { id: "details-modal", data: { itemId: "123" } }  // Top of stack
-]
-```
-
-### Modal Actions
-
-```typescript
-// Open modal
-openModal("confirm-dialog", { itemId: "123" });
-
-// Close specific modal
-closeModal("confirm-dialog");
-
-// Close topmost modal
-closeModal();  // No ID = pop from stack
-```
-
-### Modal in Schemas
-
-```typescript
-// Open modal
-{
-  type: "button",
-  props: { text: "Delete" },
-  actions: [
-    {
-      trigger: "click",
-      type: "openModal",
-      payload: {
-        modalId: "confirm-delete",
-        data: { itemId: "{{state.selectedItemId}}" }
-      }
-    }
-  ]
-}
-
-// Close modal (from within modal)
-{
-  type: "button",
-  props: { text: "Cancel" },
-  actions: [
-    { trigger: "click", type: "closeModal" }
-  ]
+  return (
+    <html lang={tenant.localization.locale}>
+      <body>
+        <TenantProvider tenant={tenant}>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </TenantProvider>
+      </body>
+    </html>
+  );
 }
 ```
 
@@ -510,172 +328,27 @@ closeModal();  // No ID = pop from stack
 
 ## Best Practices
 
-### 1. Use the Right State Type
-
-| Use Case | State Type |
-|----------|------------|
-| User session data | `context` |
-| Tab selection | `screenState` |
-| Selected item for multi-screen flow | `state` |
-| Form input values | `formState` |
-| API response | `apiData` |
-
-### 2. Keep State Minimal
-
-```typescript
-// Good - store only what you need
-screenState: { selectedTab: "billing" }
-
-// Avoid - storing derived data
-screenState: {
-  selectedTab: "billing",
-  isBillingSelected: true,  // Redundant
-  tabCount: 3               // Can be computed
-}
-```
-
-### 3. Use Selective Subscriptions
-
-```typescript
-// Good - specific selection
-const user = useSDUIStore((s) => s.context.user);
-
-// Avoid - entire store
-const store = useSDUIStore();
-```
-
-### 4. Initialize Screen State
-
-When a screen has `initialState`, it's applied on mount:
-
-```typescript
-// In schema
-{
-  id: "dashboard",
-  initialState: {
-    activeTab: "overview",
-    showWelcome: true
-  },
-  components: [...]
-}
-```
-
-The `ScreenPage` component handles this:
-
-```typescript
-useEffect(() => {
-  if (screen?.initialState) {
-    initializeScreenState(screen.initialState);
-  }
-}, [screen]);
-```
-
-### 5. Clean Up on Navigation
-
-Screen state resets automatically, but you may need to clean persistent state:
-
-```typescript
-// Before navigating away
-actions: [
-  {
-    trigger: "click",
-    type: "setPersistentState",
-    payload: { temporaryData: null }
-  },
-  {
-    trigger: "click",
-    type: "navigate",
-    payload: { route: "/" }
-  }
-]
-```
-
-### 6. Debug with Store Inspection
-
-```typescript
-// In browser console
-console.log(useSDUIStore.getState());
-
-// Or add to window for easy access
-if (typeof window !== "undefined") {
-  window.sduiStore = useSDUIStore;
-}
-// Then: sduiStore.getState()
-```
+1. **Keep contexts focused** - One concern per context
+2. **Memoize callbacks** - Use `useCallback` for context methods
+3. **Handle loading states** - Show appropriate UI while loading
+4. **Use local state first** - Only lift state when needed
+5. **Don't over-context** - Not everything needs to be in context
 
 ---
 
-## Exercises
+## When to Consider Zustand/Redux
 
-### Exercise 1: Add a Toast Queue
+If you need:
+- Complex state updates across many components
+- Time-travel debugging
+- State persistence
+- Middleware (logging, async)
 
-Extend the store to manage a toast notification queue:
-
-```typescript
-interface Toast {
-  id: string;
-  type: "success" | "error" | "info";
-  message: string;
-  duration?: number;
-}
-
-// Add to store
-toasts: Toast[];
-addToast: (toast: Omit<Toast, "id">) => void;
-removeToast: (id: string) => void;
-```
-
-### Exercise 2: Add Undo/Redo
-
-Implement undo/redo for state changes:
-
-```typescript
-history: {
-  past: State[];
-  future: State[];
-};
-undo: () => void;
-redo: () => void;
-```
-
-### Exercise 3: Persist State to localStorage
-
-Add persistence for user preferences:
-
-```typescript
-// Use zustand/middleware
-import { persist } from "zustand/middleware";
-
-const useStore = create(
-  persist(
-    (set) => ({
-      preferences: { theme: "light" },
-      setPreferences: (prefs) => set({ preferences: prefs }),
-    }),
-    { name: "sdui-preferences" }
-  )
-);
-```
-
-### Exercise 4: Add State Selectors
-
-Create reusable selectors:
-
-```typescript
-// selectors.ts
-export const selectUser = (state: SDUIStore) => state.context.user;
-export const selectIsAuthenticated = (state: SDUIStore) => !!state.context.user;
-export const selectFormValue = (field: string) =>
-  (state: SDUIStore) => state.formState.values[field];
-
-// Usage
-const user = useSDUIStore(selectUser);
-const email = useSDUIStore(selectFormValue("email"));
-```
+Then consider adding Zustand (simpler) or Redux (more features).
 
 ---
 
 ## Next Steps
 
-- **[Extending](./07-extending.md)** - Implementing unfinished features
-- **[Troubleshooting](./08-troubleshooting.md)** - Common issues and solutions
+- [Extending](./07-extending.md) - Add new features
+- [Troubleshooting](./08-troubleshooting.md) - Debug issues

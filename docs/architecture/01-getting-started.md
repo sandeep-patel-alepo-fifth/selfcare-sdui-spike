@@ -1,467 +1,234 @@
 # Getting Started
 
-This guide will help you set up your development environment and make your first changes to the SDUI framework.
-
-## Table of Contents
-
-1. [Prerequisites](#prerequisites)
-2. [Installation](#installation)
-3. [Running the Project](#running-the-project)
-4. [Project Tour](#project-tour)
-5. [Your First Changes](#your-first-changes)
-6. [Development Workflow](#development-workflow)
-
----
+This guide walks you through setting up the Alepo Enterprise Selfcare Boilerplate and making your first changes.
 
 ## Prerequisites
 
-Before starting, ensure you have:
-
-- **Node.js 18+** - JavaScript runtime ([download](https://nodejs.org/))
-- **npm** - Package manager (comes with Node.js)
-- **Git** - Version control ([download](https://git-scm.com/))
-- **MongoDB** - Database (local or [MongoDB Atlas](https://www.mongodb.com/atlas))
-- **Code Editor** - VS Code recommended ([download](https://code.visualstudio.com/))
-
-### Recommended VS Code Extensions
-
-- **ESLint** - JavaScript/TypeScript linting
-- **Tailwind CSS IntelliSense** - CSS class autocomplete
-- **Prisma** - Database schema syntax highlighting
-- **Pretty TypeScript Errors** - Better error messages
+- **Node.js** 18+ (LTS recommended)
+- **npm** 9+ or **pnpm** 8+
+- **MongoDB** 6+ (local or Atlas)
+- **Git**
+- **VS Code** (recommended) with extensions:
+  - ESLint
+  - Prettier
+  - TypeScript and JavaScript Language Features
 
 ---
 
-## Installation
+## Quick Setup
 
-### 1. Clone the Repository
+### 1. Clone and Install
 
 ```bash
+# Clone the repository
 git clone <repository-url>
-cd selfcare-spike
-```
+cd alepo-selfcare-boilerplate
 
-### 2. Install Dependencies
-
-```bash
+# Install dependencies
 npm install
 ```
 
-This installs all packages defined in `package.json`:
-
-| Package | Purpose |
-|---------|---------|
-| `next` | React framework |
-| `react`, `react-dom` | UI library |
-| `zustand` | State management |
-| `@prisma/client` | Database ORM |
-| `zod` | Schema validation |
-| `tailwindcss` | CSS framework |
-| `sonner` | Toast notifications |
-| `lucide-react` | Icons |
-| `recharts` | Charts |
-| `@monaco-editor/react` | Code editor (for admin) |
-
-### 3. Set Up Environment Variables
+### 2. Environment Setup
 
 ```bash
-# Copy the example env file
+# Copy environment template
 cp .env.example .env
 ```
 
-Edit `.env` with your values:
+Edit `.env` with your configuration:
 
 ```env
-# MongoDB connection string
-# For local MongoDB: mongodb://localhost:27017/selfcare-sdui
-# For MongoDB Atlas: mongodb+srv://user:password@cluster.mongodb.net/selfcare-sdui
-DATABASE_URL="mongodb://localhost:27017/selfcare-sdui"
+# Database
+DATABASE_URL="mongodb://localhost:27017/selfcare"
 
-# App URL (used for absolute URLs)
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
+# Auth
+JWT_SECRET="your-secret-key-min-32-chars"
+JWT_EXPIRY="15m"
+REFRESH_TOKEN_EXPIRY="7d"
+
+# CRM Integration (optional for development)
+CRM_BASE_URL="https://crm.example.com/api"
+CRM_CLIENT_ID="your-client-id"
+CRM_CLIENT_SECRET="your-client-secret"
+
+# Default tenant for development
+DEFAULT_TENANT_ID="demo"
 ```
 
-### 4. Generate Prisma Client
+### 3. Database Setup
 
 ```bash
+# Generate Prisma client
 npm run db:generate
-```
 
-This generates TypeScript types from your Prisma schema.
-
-### 5. Push Database Schema (Optional)
-
-If you have a MongoDB instance running:
-
-```bash
+# Push schema to database (development)
 npm run db:push
+
+# Or run migrations (production)
+npm run db:migrate
 ```
 
-This creates the collections and indexes defined in `prisma/schema.prisma`.
-
-**Note:** The app works without a database - it falls back to mock screens.
-
----
-
-## Running the Project
-
-### Development Server
+### 4. Start Development Server
 
 ```bash
 npm run dev
 ```
 
-This starts the development server with Turbopack (fast refresh) at http://localhost:3000.
+Visit http://localhost:3000
 
-### Available Routes
+---
 
-| Route | Description |
-|-------|-------------|
-| `/` | Home page |
-| `/dashboard` | Main dashboard (mock user data) |
-| `/onboarding` | Multi-step onboarding flow |
-| `/admin` | Admin panel (if implemented) |
-| `/api/screens/[screenId]` | API: Get screen schema |
-| `/api/schemas` | API: List/create schemas |
+## Project Scripts
 
-### Other Commands
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start development server with hot reload |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run tests with Vitest |
+| `npm run test:ui` | Run tests with UI |
+| `npm run db:generate` | Generate Prisma client |
+| `npm run db:push` | Push schema to database |
+| `npm run db:migrate` | Run database migrations |
+| `npm run db:studio` | Open Prisma Studio |
+
+---
+
+## First Changes
+
+### Adding a New Tenant
+
+1. Create tenant configuration file:
 
 ```bash
-npm run build    # Production build
-npm run start    # Start production server
-npm run lint     # Run ESLint
-npm run db:studio # Open Prisma Studio (database GUI)
+touch config/tenants/acme.json
 ```
 
----
+2. Add tenant configuration:
 
-## Project Tour
-
-Let's explore the key files you'll work with.
-
-### The Dashboard Page
-
-**File:** `src/app/dashboard/page.tsx`
-
-```typescript
-"use client";
-
-import { ScreenPage } from "@/components/sdui/screen-page";
-import { dashboardScreen } from "@/lib/sdui/schemas/dashboard";
-
-export default function DashboardPage() {
-  return <ScreenPage screenId="dashboard" initialScreen={dashboardScreen} />;
-}
-```
-
-This is surprisingly simple. The `ScreenPage` component does all the work:
-1. Takes a `screenId` to fetch from API (or uses `initialScreen` as fallback)
-2. Sets up the Zustand store connections
-3. Renders the `ScreenRenderer` with all the necessary props
-
-### The Screen Schema
-
-**File:** `src/lib/sdui/schemas/dashboard.ts`
-
-Open this file and scroll through it. You'll see:
-
-```typescript
-export const dashboardScreen: Screen = {
-  version: "1.0",
-  id: "dashboard",
-  type: "screen",
-  meta: { title: "Dashboard", requiresAuth: true, tags: ["dashboard", "home"] },
-  layout: { type: "grid", columns: 12, gap: 8 },
-  components: [
-    // Header Section
-    {
-      id: "header-container",
-      type: "container",
-      className: "col-span-12 mb-2",
-      children: [
-        {
-          id: "greeting",
-          type: "flex",
-          props: { justify: "between", align: "center" },
-          children: [
-            // ... nested components
-          ]
-        }
-      ]
-    },
-    // More components...
-  ]
-};
-```
-
-Notice:
-- Components nest inside each other via `children`
-- Template strings like `{{user.firstName}}` pull from context
-- `conditions` control when components render
-- `actions` define interactivity
-
-### The Renderer
-
-**File:** `src/lib/sdui/renderer.tsx`
-
-This is the heart of the SDUI framework. The key function is `DynamicComponent`:
-
-```typescript
-function DynamicComponent({ node, rendererProps }: DynamicComponentProps): ReactNode {
-  // 1. Build context for evaluation
-  const fullContext = useMemo(() => ({ ...context, state, form, api }), [...]);
-
-  // 2. Check if this component should render
-  const shouldRender = useMemo(() => {
-    if (!node.conditions) return true;
-    return evaluateConditions(node.conditions, fullContext);
-  }, [node.conditions, fullContext]);
-
-  // 3. Resolve data bindings
-  const resolvedBindings = useMemo(() => {
-    return resolveDataBindings(node.dataBinding, context);
-  }, [node.dataBinding, context]);
-
-  // 4. Resolve template strings in props
-  const resolvedProps = useMemo(() => {
-    return resolveAllTemplates(node.props, fullContext);
-  }, [node.props, fullContext]);
-
-  // 5. Create action handlers
-  const actionHandlers = useMemo(() => {
-    return createActionHandlers(node.actions, actionContext);
-  }, [node.actions, actionContext]);
-
-  // 6. Get the actual React component
-  const Component = getComponent(node.type);
-
-  // 7. Render with children
-  return <Component {...props}>{children}</Component>;
-}
-```
-
-### The Component Registry
-
-**File:** `src/lib/sdui/component-registry.tsx`
-
-This maps string types to React components:
-
-```typescript
-export const componentRegistry: ComponentRegistry = {
-  // Layout
-  container: Container,
-  grid: Grid,
-  flex: Flex,
-  stack: Stack,
-
-  // Data Display
-  text: Text,
-  heading: Heading,
-  card: Card,
-
-  // Input
-  input: Input,
-  select: Select,
-  checkbox: Checkbox,
-
-  // Navigation
-  button: Button,
-  link: Link,
-  tabs: Tabs,
-
-  // Domain-Specific
-  usageWidget: UsageWidget,
-  planCard: PlanCard,
-  // ...
-};
-
-export function getComponent(type: ComponentType): ReactComponentType | null {
-  return componentRegistry[type] || null;
-}
-```
-
----
-
-## Your First Changes
-
-Let's make some changes to understand how everything works.
-
-### Exercise 1: Modify a Template String
-
-**Goal:** Change the greeting text on the dashboard.
-
-1. Open `src/lib/sdui/schemas/dashboard.ts`
-2. Find the `welcome-text` component (around line 43):
-
-```typescript
+```json
 {
-  id: "welcome-text",
-  type: "text",
-  props: {
-    text: "Welcome back,",
-    variant: "small",
-    color: "secondary",
+  "id": "acme",
+  "name": "ACME Telecom",
+  "status": "active",
+  "branding": {
+    "logo": "/logos/acme.svg",
+    "primaryColor": "#2563eb",
+    "secondaryColor": "#1e40af",
+    "theme": "light"
   },
-},
-```
-
-3. Change the text:
-
-```typescript
-{
-  id: "welcome-text",
-  type: "text",
-  props: {
-    text: "Good to see you,",  // Changed!
-    variant: "small",
-    color: "secondary",
+  "features": {
+    "autopay": true,
+    "familyAccounts": true,
+    "chatbot": false,
+    "expressPay": true
   },
-},
-```
-
-4. Save and check http://localhost:3000/dashboard
-
-The text should update immediately (hot reload).
-
-### Exercise 2: Add Conditional Rendering
-
-**Goal:** Show a special message only for prepaid users.
-
-1. In `dashboard.ts`, find the `header-container` component
-2. Add a new child component with a condition:
-
-```typescript
-{
-  id: "prepaid-notice",
-  type: "alert",
-  props: {
-    variant: "info",
-    title: "Prepaid User",
-    description: "Top up your account to keep enjoying our services!"
+  "localization": {
+    "dateFormat": "MM/DD/YYYY",
+    "timezone": "America/New_York",
+    "currency": "USD",
+    "locale": "en-US"
   },
-  conditions: {
-    field: "user.plan.type",
-    operator: "eq",
-    value: "prepaid"
+  "contact": {
+    "supportEmail": "support@acme.com",
+    "supportPhone": "+1-800-555-0123"
   }
 }
 ```
 
-3. To test, modify the mock user in `src/lib/sdui/store.ts`:
+3. Add logo to `public/logos/acme.svg`
 
-```typescript
-const initialMockUser: SDUIContextData["user"] = {
-  // ...
-  plan: {
-    type: "prepaid",  // Change from "postpaid" to "prepaid"
-    name: "Basic",
-    price: 19.99,
-  },
-  // ...
-};
+4. Access at `http://acme.localhost:3000`
+
+### Creating a New Page
+
+1. Create the route:
+
+```bash
+mkdir -p src/app/\(portal\)/rewards
+touch src/app/\(portal\)/rewards/page.tsx
 ```
 
-4. Refresh the dashboard - you should see the alert.
-5. Change back to "postpaid" - the alert disappears.
+2. Add the page component:
 
-### Exercise 3: Add a Click Action
+```tsx
+// src/app/(portal)/rewards/page.tsx
+'use client';
 
-**Goal:** Add a button that shows a toast notification.
+import { Box, Typography, Card, CardContent } from '@mui/material';
+import { useTenant } from '@/lib/core/tenant-context';
+import { useAuth } from '@/lib/core/auth-context';
 
-1. In `dashboard.ts`, add a new button to the quick actions section:
+export default function RewardsPage() {
+  const tenant = useTenant();
+  const { user } = useAuth();
 
-```typescript
-{
-  id: "action-test-toast",
-  type: "button",
-  props: {
-    variant: "outline",
-    text: "Test Toast",
-    className: "w-full justify-start",
-  },
-  actions: [
-    {
-      trigger: "click",
-      type: "showToast",
-      payload: {
-        type: "success",
-        title: "It works!",
-        message: "You successfully triggered an action."
-      }
-    }
-  ]
-}
-```
-
-2. Click the button on the dashboard - a toast should appear.
-
-### Exercise 4: Create a New Component
-
-**Goal:** Add a simple "InfoBox" component to the registry.
-
-1. Create `src/components/ui/info-box.tsx`:
-
-```typescript
-import { cn } from "@/lib/utils/cn";
-
-interface InfoBoxProps {
-  title: string;
-  children?: React.ReactNode;
-  className?: string;
-  icon?: React.ReactNode;
-}
-
-export function InfoBox({ title, children, className, icon }: InfoBoxProps) {
   return (
-    <div className={cn(
-      "rounded-lg border border-blue-200 bg-blue-50 p-4",
-      className
-    )}>
-      <div className="flex items-start gap-3">
-        {icon && <div className="text-blue-500">{icon}</div>}
-        <div>
-          <h4 className="font-medium text-blue-900">{title}</h4>
-          {children && (
-            <p className="mt-1 text-sm text-blue-700">{children}</p>
-          )}
-        </div>
-      </div>
-    </div>
+    <Box>
+      <Typography variant="h4" gutterBottom>
+        Rewards Program
+      </Typography>
+      <Card>
+        <CardContent>
+          <Typography variant="h6">
+            Welcome, {user?.firstName}!
+          </Typography>
+          <Typography color="text.secondary">
+            Earn rewards with {tenant.name}
+          </Typography>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }
 ```
 
-2. Register it in `src/lib/sdui/component-registry.tsx`:
+### Adding a Form with JSON Forms
 
-```typescript
-import { InfoBox } from "@/components/ui/info-box";
+1. Create screen configuration:
 
-// Add to the registry
-export const componentRegistry: ComponentRegistry = {
-  // ... existing components
-  infoBox: InfoBox,
-};
-```
-
-3. Add the type to `src/types/sdui.ts`:
-
-```typescript
-export const ComponentTypeSchema = z.enum([
-  // ... existing types
-  "infoBox",
-]);
-```
-
-4. Use it in a screen schema:
-
-```typescript
+```json
+// src/screens/rewards/redeem.json
 {
-  id: "my-info-box",
-  type: "infoBox",
-  props: {
-    title: "Did you know?",
-    children: "You can customize this SDUI framework!"
+  "id": "rewards-redeem",
+  "type": "form",
+  "title": "Redeem Rewards",
+  "form": {
+    "schema": {
+      "type": "object",
+      "required": ["rewardCode"],
+      "properties": {
+        "rewardCode": {
+          "type": "string",
+          "title": "Reward Code",
+          "minLength": 8,
+          "pattern": "^[A-Z0-9]+$"
+        }
+      }
+    }
+  },
+  "actions": {
+    "submit": {
+      "type": "api",
+      "endpoint": "/api/rewards/redeem",
+      "method": "POST"
+    }
   }
+}
+```
+
+2. Use ScreenLoader to render:
+
+```tsx
+// src/app/(portal)/rewards/redeem/page.tsx
+'use client';
+
+import { ScreenLoader } from '@/lib/sdui/screen-loader';
+import redeemScreen from '@/screens/rewards/redeem.json';
+
+export default function RedeemPage() {
+  return <ScreenLoader screen={redeemScreen} />;
 }
 ```
 
@@ -469,86 +236,81 @@ export const ComponentTypeSchema = z.enum([
 
 ## Development Workflow
 
-### Making Schema Changes
+### Feature Flags
 
-1. **Edit the schema** in `src/lib/sdui/schemas/` or via the database
-2. **Hot reload** shows changes immediately
-3. **Test conditions** by modifying mock data in `store.ts`
-4. **Debug** using browser DevTools and `console.log`
+```tsx
+import { useFeature } from '@/lib/core/tenant-context';
 
-### Making Framework Changes
+function RewardsSection() {
+  const hasRewards = useFeature('rewardsProgram');
 
-1. **Edit core files** in `src/lib/sdui/`
-2. **TypeScript** catches most errors immediately
-3. **Test with existing screens** to verify nothing broke
-4. **Add new types** to `src/types/sdui.ts` first
+  if (!hasRewards) return null;
 
-### Adding New Components
+  return <RewardsWidget />;
+}
+```
 
-1. Create the React component in `src/components/ui/`
-2. Add to the registry in `component-registry.tsx`
-3. Add the type to `sdui.ts`
-4. (Optional) Export from `src/components/ui/index.ts`
+### API Calls
 
-### Database Development
+```tsx
+import { useApi } from '@/lib/core/api-client';
 
-```bash
-# Open Prisma Studio (visual database editor)
-npm run db:studio
+function BalanceWidget() {
+  const api = useApi();
+  const [balance, setBalance] = useState(null);
 
-# After changing prisma/schema.prisma
-npm run db:generate  # Regenerate client
-npm run db:push      # Push changes to database
+  useEffect(() => {
+    api.get('/billing/balance').then(setBalance);
+  }, [api]);
+
+  return <div>Balance: {balance?.amount}</div>;
+}
+```
+
+### Theming
+
+MUI theme auto-derives from tenant branding:
+
+```tsx
+import { useTheme } from '@mui/material/styles';
+
+function BrandedButton() {
+  const theme = useTheme();
+
+  return (
+    <Button sx={{ backgroundColor: theme.palette.primary.main }}>
+      Click Me
+    </Button>
+  );
+}
 ```
 
 ---
 
-## Common Gotchas
+## Common Issues
 
-### 1. Template strings not resolving
+### Port Already in Use
 
-**Symptom:** You see `{{user.name}}` literally instead of the value.
+```bash
+lsof -i :3000
+kill -9 <PID>
+```
 
-**Cause:** The path doesn't exist in the context.
+### Database Connection Failed
 
-**Fix:** Check that the data exists in `store.ts` mock data or context.
+1. Ensure MongoDB is running
+2. Check `DATABASE_URL` in `.env`
+3. Run `npm run db:push`
 
-### 2. Component not rendering
+### Tenant Not Found
 
-**Symptom:** Component doesn't appear.
-
-**Causes:**
-- Condition evaluates to false
-- Component type not in registry
-- Parent has `children: []` instead of nested children
-
-**Fix:** Check console for warnings, verify conditions, check registry.
-
-### 3. Actions not firing
-
-**Symptom:** Click/submit doesn't do anything.
-
-**Causes:**
-- Wrong trigger (e.g., `submit` instead of `click`)
-- Action type misspelled
-- Missing payload
-
-**Fix:** Add `console.log` in `action-dispatcher.ts` to debug.
-
-### 4. TypeScript errors after adding component
-
-**Symptom:** Type errors about component type.
-
-**Cause:** Type not added to `ComponentTypeSchema` in `sdui.ts`.
-
-**Fix:** Add the new type to the enum.
+1. Check config exists in `config/tenants/`
+2. Set `DEFAULT_TENANT_ID` in `.env`
 
 ---
 
 ## Next Steps
 
-Now that you have the project running and made your first changes:
-
-1. **[SDUI Core](./02-sdui-core.md)** - Deep dive into how the renderer works
-2. **[Actions System](./03-actions-system.md)** - Understand all action types
-3. **[Components](./04-components.md)** - Build production-quality components
+- [SDUI Core](./02-sdui-core.md) - Screen configuration
+- [Components](./04-components.md) - Build components
+- [API Layer](./05-api-layer.md) - Create endpoints

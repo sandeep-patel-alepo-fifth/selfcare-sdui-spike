@@ -1,809 +1,354 @@
 # Extending the Framework
 
-This document provides guidance on implementing features that are defined but not yet fully wired up in the codebase.
+This document provides guidance on adding new features and modules to the selfcare platform.
 
-## Table of Contents
+## Feature Implementation Checklist
 
-1. [Feature Status Overview](#feature-status-overview)
-2. [Implementing Authentication](#implementing-authentication)
-3. [Custom Component Registration](#custom-component-registration)
-4. [A/B Testing (Experiments)](#ab-testing-experiments)
-5. [Theme System](#theme-system)
-6. [Audit Logging](#audit-logging)
-7. [Real API Integration](#real-api-integration)
-8. [Validation System](#validation-system)
+When adding a new feature:
 
----
-
-## Feature Status Overview
-
-| Feature | Schema/Types | Database | API | UI | Status |
-|---------|--------------|----------|-----|----|-|
-| Screen rendering | Yes | Yes | Yes | Yes | **Complete** |
-| Actions system | Yes | N/A | N/A | Yes | **Complete** |
-| Conditions | Yes | N/A | N/A | Yes | **Complete** |
-| Data binding | Yes | N/A | N/A | Yes | **Complete** |
-| Multi-tenant | Yes | Yes | Partial | No | Needs work |
-| Themes | Yes | Yes | No | No | Needs work |
-| A/B Testing | Yes | Yes | No | No | Needs work |
-| Auth | No | No | No | No | Not started |
-| Audit logging | No | Yes | No | No | Needs work |
-| Custom components | Yes | Yes | No | No | Needs work |
-| Form validation | Yes | N/A | N/A | Partial | Needs work |
+1. [ ] Define types in `src/types/`
+2. [ ] Create API routes in `src/app/api/`
+3. [ ] Build components in `src/components/selfcare/`
+4. [ ] Create screen configs in `src/screens/`
+5. [ ] Add feature flag to tenant config
+6. [ ] Update documentation
 
 ---
 
-## Implementing Authentication
+## Adding a New Module
 
-The codebase doesn't have authentication yet. Here's how to add it.
+### Example: Voucher Redemption
 
-### Step 1: Choose an Auth Provider
-
-Options:
-- **NextAuth.js** - Full-featured, supports many providers
-- **Clerk** - Managed auth service
-- **Auth0** - Enterprise-grade
-- **Custom JWT** - Full control
-
-### Step 2: Add Auth Middleware
-
-Create `src/middleware.ts`:
+#### 1. Define Types
 
 ```typescript
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-
-export function middleware(request: NextRequest) {
-  // Get the auth token from cookies
-  const token = request.cookies.get("auth-token")?.value;
-
-  // Protected routes
-  const protectedPaths = ["/dashboard", "/admin", "/api/schemas"];
-  const isProtected = protectedPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  );
-
-  if (isProtected && !token) {
-    // Redirect to login
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/api/:path*"],
-};
-```
-
-### Step 3: Add User Context
-
-Update `src/lib/sdui/store.ts`:
-
-```typescript
-interface AuthState {
-  isAuthenticated: boolean;
-  user: User | null;
-  token: string | null;
-  login: (token: string, user: User) => void;
-  logout: () => void;
-}
-
-// Add to store
-isAuthenticated: false,
-login: (token, user) => set({
-  isAuthenticated: true,
-  context: { ...get().context, user },
-  // Store token in cookie/localStorage
-}),
-logout: () => set({
-  isAuthenticated: false,
-  context: { ...get().context, user: null },
-}),
-```
-
-### Step 4: Protect Screens
-
-Use the `meta.requiresAuth` field:
-
-```typescript
-// In screen-page.tsx
-if (screen.meta?.requiresAuth && !isAuthenticated) {
-  router.push("/login");
-  return null;
-}
-```
-
-### Step 5: Add Role-Based Access
-
-```typescript
-// In screen schema
-{
-  meta: {
-    requiresAuth: true,
-    roles: ["admin", "manager"]
-  }
-}
-
-// In screen-page.tsx
-const userRole = context.user?.role;
-const allowedRoles = screen.meta?.roles || [];
-
-if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-  router.push("/unauthorized");
-  return null;
-}
-```
-
----
-
-## Custom Component Registration
-
-The database has a `ComponentDefinition` model but it's not wired up.
-
-### Step 1: Create the API
-
-Create `src/app/api/components/route.ts`:
-
-```typescript
-import { prisma } from "@/lib/db/prisma";
-
-export async function GET() {
-  const components = await prisma.componentDefinition.findMany({
-    orderBy: { category: "asc" },
-  });
-  return NextResponse.json({ components });
-}
-
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-
-  const component = await prisma.componentDefinition.create({
-    data: {
-      type: body.type,
-      name: body.name,
-      description: body.description,
-      category: body.category,
-      propsSchema: body.propsSchema,
-      defaultProps: body.defaultProps,
-      examples: body.examples,
-      isBuiltIn: false,
-    },
-  });
-
-  return NextResponse.json({ component }, { status: 201 });
-}
-```
-
-### Step 2: Dynamic Component Loading
-
-Create `src/lib/sdui/dynamic-registry.ts`:
-
-```typescript
-import { componentRegistry } from "./component-registry";
-
-let customComponents: Record<string, React.ComponentType> = {};
-
-export async function loadCustomComponents() {
-  try {
-    const response = await fetch("/api/components");
-    const { components } = await response.json();
-
-    // For now, custom components would need to be pre-compiled
-    // A full solution would need a component compiler/bundler
-    console.log("Custom components:", components);
-  } catch (error) {
-    console.error("Failed to load custom components:", error);
-  }
-}
-
-export function getComponent(type: string): React.ComponentType | null {
-  // Check custom first, then built-in
-  return customComponents[type] || componentRegistry[type] || null;
-}
-```
-
-### Step 3: Admin UI for Component Management
-
-Create an admin page to:
-1. List all registered components
-2. Add new component definitions
-3. Preview components with example props
-
-### Future: Remote Component Loading
-
-For truly dynamic components, you'd need:
-1. Component code storage (S3, database)
-2. Runtime bundling (esbuild, webpack)
-3. Sandboxed execution (iframe, web workers)
-
-This is complex and may not be worth the security risks.
-
----
-
-## A/B Testing (Experiments)
-
-The `Experiment` model exists but needs wiring.
-
-### Step 1: Create Experiment API
-
-Create `src/app/api/experiments/route.ts`:
-
-```typescript
-export async function GET() {
-  const experiments = await prisma.experiment.findMany({
-    where: { status: "RUNNING" },
-  });
-  return NextResponse.json({ experiments });
-}
-
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-
-  const experiment = await prisma.experiment.create({
-    data: {
-      experimentId: body.experimentId,
-      name: body.name,
-      description: body.description,
-      screenId: body.screenId,
-      variants: body.variants,
-      traffic: body.traffic,
-      status: "DRAFT",
-    },
-  });
-
-  return NextResponse.json({ experiment }, { status: 201 });
-}
-```
-
-### Step 2: Variant Assignment
-
-Create `src/lib/sdui/experiments.ts`:
-
-```typescript
-interface Experiment {
+// types/voucher.ts
+export interface Voucher {
   id: string;
-  variants: { id: string; screenId: string; weight: number }[];
+  code: string;
+  type: 'data' | 'credit' | 'validity';
+  value: number;
+  unit: string;
+  status: 'active' | 'redeemed' | 'expired';
+  expiresAt: string;
 }
 
-export function assignVariant(
-  experiment: Experiment,
-  userId: string
-): string {
-  // Consistent hashing - same user always gets same variant
-  const hash = hashString(`${experiment.id}-${userId}`);
-  const normalized = hash / 0xffffffff;  // 0 to 1
+export interface RedeemVoucherRequest {
+  code: string;
+}
 
-  let cumulative = 0;
-  for (const variant of experiment.variants) {
-    cumulative += variant.weight;
-    if (normalized < cumulative) {
-      return variant.id;
+export interface RedeemVoucherResponse {
+  success: boolean;
+  voucher?: Voucher;
+  error?: string;
+}
+```
+
+#### 2. Create API Route
+
+```typescript
+// app/api/vouchers/redeem/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getTenantFromRequest } from '@/lib/core/tenant';
+import { getAuthFromRequest } from '@/lib/core/auth';
+
+const redeemSchema = z.object({
+  code: z.string().min(8).max(16).regex(/^[A-Z0-9]+$/),
+});
+
+export async function POST(request: NextRequest) {
+  const tenant = await getTenantFromRequest(request);
+  const auth = await getAuthFromRequest(request);
+
+  if (!tenant || !auth) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Check feature flag
+  if (!tenant.features.voucherRedemption) {
+    return NextResponse.json({ error: 'Feature not available' }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const result = redeemSchema.safeParse(body);
+
+  if (!result.success) {
+    return NextResponse.json({
+      success: false,
+      errors: { code: 'Invalid voucher code format' },
+    }, { status: 400 });
+  }
+
+  // Call CRM to redeem voucher
+  const voucher = await redeemVoucher(tenant, auth.userId, result.data.code);
+
+  return NextResponse.json({
+    success: true,
+    data: voucher,
+    toast: { type: 'success', message: `Redeemed ${voucher.value} ${voucher.unit}!` },
+  });
+}
+```
+
+#### 3. Build Components
+
+```typescript
+// components/selfcare/vouchers/voucher-form.tsx
+'use client';
+
+import { useState } from 'react';
+import { Box, TextField, Button, Alert } from '@mui/material';
+import { useApi } from '@/lib/core/api-client';
+
+export function VoucherForm({ onSuccess }) {
+  const api = useApi();
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await api.post('/vouchers/redeem', { code });
+      if (result.success) {
+        onSuccess?.(result.data);
+        setCode('');
+      } else {
+        setError(result.errors?.code || 'Failed to redeem');
+      }
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
     }
-  }
-
-  return experiment.variants[0].id;
-}
-
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash);
-}
-```
-
-### Step 3: Integrate with Screen Loading
-
-```typescript
-// In screen-page.tsx or API route
-async function getScreenWithExperiment(
-  screenId: string,
-  userId: string
-): Promise<Screen> {
-  // Check for active experiment
-  const experiment = await prisma.experiment.findFirst({
-    where: { screenId, status: "RUNNING" },
-  });
-
-  if (!experiment) {
-    return getScreen(screenId);
-  }
-
-  // Assign variant
-  const variantId = assignVariant(experiment, userId);
-  const variant = experiment.variants.find((v) => v.id === variantId);
-
-  // Return variant screen
-  return getScreen(variant.screenId);
-}
-```
-
-### Step 4: Track Results
-
-```typescript
-// Track which variant user saw
-await prisma.experimentEvent.create({
-  data: {
-    experimentId: experiment.id,
-    variantId,
-    userId,
-    event: "view",
-  },
-});
-
-// Track conversions
-await prisma.experimentEvent.create({
-  data: {
-    experimentId,
-    variantId,
-    userId,
-    event: "conversion",
-  },
-});
-```
-
----
-
-## Theme System
-
-Themes are defined in the database but not applied.
-
-### Step 1: Create Theme API
-
-```typescript
-// GET /api/themes/:themeId
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  const { themeId } = await params;
-
-  const theme = await prisma.theme.findUnique({
-    where: { themeId },
-  });
-
-  if (!theme) {
-    return NextResponse.json({ error: "Theme not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ theme });
-}
-```
-
-### Step 2: CSS Variable Generator
-
-Create `src/lib/sdui/theme-generator.ts`:
-
-```typescript
-interface Theme {
-  colors: Record<string, string>;
-  typography?: {
-    fontFamily?: string;
-    fontSize?: Record<string, string>;
   };
-  spacing?: Record<string, string>;
-  borderRadius?: Record<string, string>;
-}
-
-export function generateCSSVariables(theme: Theme): string {
-  const vars: string[] = [];
-
-  // Colors
-  for (const [name, value] of Object.entries(theme.colors)) {
-    vars.push(`--color-${name}: ${value};`);
-  }
-
-  // Typography
-  if (theme.typography?.fontFamily) {
-    vars.push(`--font-family: ${theme.typography.fontFamily};`);
-  }
-  if (theme.typography?.fontSize) {
-    for (const [name, value] of Object.entries(theme.typography.fontSize)) {
-      vars.push(`--font-size-${name}: ${value};`);
-    }
-  }
-
-  // Spacing
-  if (theme.spacing) {
-    for (const [name, value] of Object.entries(theme.spacing)) {
-      vars.push(`--spacing-${name}: ${value};`);
-    }
-  }
-
-  return `:root {\n  ${vars.join("\n  ")}\n}`;
-}
-```
-
-### Step 3: Apply Theme in Layout
-
-```typescript
-// In layout.tsx or a ThemeProvider
-"use client";
-
-import { useEffect, useState } from "react";
-
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeCSS, setThemeCSS] = useState("");
-
-  useEffect(() => {
-    async function loadTheme() {
-      const response = await fetch("/api/themes/default");
-      const { theme } = await response.json();
-      setThemeCSS(generateCSSVariables(theme));
-    }
-    loadTheme();
-  }, []);
 
   return (
-    <>
-      {themeCSS && <style>{themeCSS}</style>}
-      {children}
-    </>
+    <Box component="form" onSubmit={handleSubmit}>
+      <TextField
+        label="Voucher Code"
+        value={code}
+        onChange={(e) => setCode(e.target.value.toUpperCase())}
+        placeholder="Enter voucher code"
+        fullWidth
+        sx={{ mb: 2 }}
+      />
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Button type="submit" variant="contained" disabled={loading || !code}>
+        {loading ? 'Redeeming...' : 'Redeem Voucher'}
+      </Button>
+    </Box>
   );
 }
 ```
 
-### Step 4: Use CSS Variables in Components
+#### 4. Create Screen Config
 
-```typescript
-// In Tailwind config or component styles
-.button-primary {
-  background-color: var(--color-primary);
-  font-family: var(--font-family);
-}
-```
-
----
-
-## Audit Logging
-
-The `AuditLog` model exists but isn't populated.
-
-### Step 1: Create Logging Utility
-
-Create `src/lib/audit.ts`:
-
-```typescript
-import { prisma } from "@/lib/db/prisma";
-
-interface AuditLogInput {
-  action: string;
-  entityType: string;
-  entityId: string;
-  userId?: string;
-  tenantId?: string;
-  changes?: unknown;
-  metadata?: unknown;
-}
-
-export async function logAudit(input: AuditLogInput): Promise<void> {
-  try {
-    await prisma.auditLog.create({
-      data: {
-        action: input.action,
-        entityType: input.entityType,
-        entityId: input.entityId,
-        userId: input.userId,
-        tenantId: input.tenantId,
-        changes: input.changes ? JSON.parse(JSON.stringify(input.changes)) : null,
-        metadata: input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : null,
-      },
-    });
-  } catch (error) {
-    console.error("Failed to create audit log:", error);
-    // Don't throw - audit logging shouldn't break the main operation
-  }
-}
-
-// Compute diff between old and new values
-export function computeDiff(
-  oldValue: Record<string, unknown>,
-  newValue: Record<string, unknown>
-): Record<string, { old: unknown; new: unknown }> {
-  const diff: Record<string, { old: unknown; new: unknown }> = {};
-
-  const allKeys = new Set([...Object.keys(oldValue), ...Object.keys(newValue)]);
-
-  for (const key of allKeys) {
-    if (JSON.stringify(oldValue[key]) !== JSON.stringify(newValue[key])) {
-      diff[key] = { old: oldValue[key], new: newValue[key] };
+```json
+// screens/vouchers/redeem.json
+{
+  "id": "voucher-redeem",
+  "type": "form",
+  "title": "Redeem Voucher",
+  "description": "Enter your voucher code to add credit or data",
+  "form": {
+    "schema": {
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "title": "Voucher Code",
+          "minLength": 8,
+          "maxLength": 16,
+          "pattern": "^[A-Z0-9]+$"
+        }
+      }
+    }
+  },
+  "actions": {
+    "submit": {
+      "type": "api",
+      "endpoint": "/api/vouchers/redeem",
+      "method": "POST",
+      "onSuccess": {
+        "type": "navigate",
+        "route": "/vouchers/success"
+      }
     }
   }
-
-  return diff;
 }
 ```
 
-### Step 2: Add to API Routes
+#### 5. Add Feature Flag
 
-```typescript
-// In POST /api/schemas
-const screen = await prisma.screen.create({ data: {...} });
-
-await logAudit({
-  action: "CREATE_SCREEN",
-  entityType: "Screen",
-  entityId: screen.id,
-  userId: getCurrentUserId(),  // From auth
-  changes: screen.schema,
-});
-
-// In PUT /api/screens/:id
-const oldScreen = await prisma.screen.findUnique({ where: { id } });
-const newScreen = await prisma.screen.update({ where: { id }, data: {...} });
-
-await logAudit({
-  action: "UPDATE_SCREEN",
-  entityType: "Screen",
-  entityId: screen.id,
-  userId: getCurrentUserId(),
-  changes: computeDiff(oldScreen.schema, newScreen.schema),
-});
+```json
+// config/tenants/demo.json
+{
+  "features": {
+    "voucherRedemption": true
+  }
+}
 ```
 
-### Step 3: Create Audit Log API
+#### 6. Create Page Route
 
 ```typescript
-// GET /api/audit-logs
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const entityType = searchParams.get("entityType");
-  const entityId = searchParams.get("entityId");
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "50");
+// app/(portal)/vouchers/page.tsx
+'use client';
 
-  const logs = await prisma.auditLog.findMany({
-    where: {
-      ...(entityType ? { entityType } : {}),
-      ...(entityId ? { entityId } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    skip: (page - 1) * limit,
-    take: limit,
-  });
+import { Box, Typography, Card, CardContent } from '@mui/material';
+import { useFeature } from '@/lib/core/tenant-context';
+import { VoucherForm } from '@/components/selfcare/vouchers/voucher-form';
+import { redirect } from 'next/navigation';
 
-  return NextResponse.json({ logs });
+export default function VouchersPage() {
+  const hasVouchers = useFeature('voucherRedemption');
+
+  if (!hasVouchers) {
+    redirect('/dashboard');
+  }
+
+  return (
+    <Box>
+      <Typography variant="h4" gutterBottom>
+        Redeem Voucher
+      </Typography>
+      <Card>
+        <CardContent>
+          <VoucherForm onSuccess={(voucher) => console.log('Redeemed:', voucher)} />
+        </CardContent>
+      </Card>
+    </Box>
+  );
 }
 ```
 
 ---
 
-## Real API Integration
-
-Currently, the framework uses mock data. Here's how to integrate real APIs.
-
-### Step 1: API Configuration
-
-Create `src/lib/api-config.ts`:
+## Adding Custom JSON Forms Renderers
 
 ```typescript
-export const apiConfig = {
-  baseUrl: process.env.BACKEND_API_URL || "http://localhost:8080",
-  timeout: 10000,
-  headers: {
-    "Content-Type": "application/json",
-  },
+// lib/sdui/renderers/currency-input.tsx
+import { withJsonFormsControlProps } from '@jsonforms/react';
+import { rankWith, schemaMatches } from '@jsonforms/core';
+import { TextField, InputAdornment } from '@mui/material';
+import { useTenant } from '@/lib/core/tenant-context';
+
+const CurrencyInput = ({ data, handleChange, path, label, errors }) => {
+  const tenant = useTenant();
+
+  return (
+    <TextField
+      label={label}
+      type="number"
+      value={data || ''}
+      onChange={(e) => handleChange(path, parseFloat(e.target.value))}
+      error={!!errors}
+      helperText={errors}
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            {tenant.localization.currency}
+          </InputAdornment>
+        ),
+      }}
+      fullWidth
+    />
+  );
 };
 
-export async function apiClient<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
-  const response = await fetch(`${apiConfig.baseUrl}${endpoint}`, {
-    ...options,
-    headers: {
-      ...apiConfig.headers,
-      ...options?.headers,
-    },
-  });
+export const currencyInputTester = rankWith(
+  3,
+  schemaMatches((schema) => schema.format === 'currency')
+);
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
-  }
-
-  return response.json();
-}
+export const CurrencyInputRenderer = withJsonFormsControlProps(CurrencyInput);
 ```
-
-### Step 2: Replace Mock Context
-
-```typescript
-// In screen-page.tsx
-useEffect(() => {
-  async function loadUserData() {
-    try {
-      const userData = await apiClient<User>("/api/user/me");
-      setContext({ user: userData });
-    } catch (error) {
-      console.error("Failed to load user:", error);
-      // Fall back to mock or redirect to login
-    }
-  }
-  loadUserData();
-}, []);
-```
-
-### Step 3: Wire API Actions
-
-The `apiCall` action already supports real APIs:
-
-```typescript
-{
-  trigger: "click",
-  type: "apiCall",
-  payload: {
-    endpoint: "/api/plans",
-    method: "GET",
-    resultKey: "plans"
-  }
-}
-```
-
-Ensure `callApi` in screen-page.tsx points to your backend.
 
 ---
 
-## Validation System
+## Adding Admin Features
 
-Validation rules are defined in types but not fully implemented.
-
-### Step 1: Validation Rules
-
-Already defined in `src/types/sdui.ts`:
+### Tenant Management
 
 ```typescript
-export const ValidationRuleSchema = z.object({
-  type: z.enum([
-    "required",
-    "email",
-    "phone",
-    "minLength",
-    "maxLength",
-    "min",
-    "max",
-    "pattern",
-    "custom",
-  ]),
-  value: z.any().optional(),
-  message: z.string(),
+// app/admin/tenants/page.tsx
+'use client';
+
+import { DataGrid } from '@mui/x-data-grid';
+import { useEffect, useState } from 'react';
+
+export default function TenantsPage() {
+  const [tenants, setTenants] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/admin/tenants')
+      .then((r) => r.json())
+      .then(setTenants);
+  }, []);
+
+  const columns = [
+    { field: 'id', headerName: 'ID', width: 150 },
+    { field: 'name', headerName: 'Name', width: 200 },
+    { field: 'status', headerName: 'Status', width: 100 },
+    { field: 'domain', headerName: 'Domain', width: 200 },
+  ];
+
+  return (
+    <Box>
+      <Typography variant="h4">Tenants</Typography>
+      <DataGrid rows={tenants} columns={columns} />
+    </Box>
+  );
+}
+```
+
+---
+
+## Testing New Features
+
+```typescript
+// __tests__/vouchers/redeem.test.ts
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { VoucherForm } from '@/components/selfcare/vouchers/voucher-form';
+
+describe('VoucherForm', () => {
+  it('validates voucher code format', async () => {
+    const onSuccess = vi.fn();
+    render(<VoucherForm onSuccess={onSuccess} />);
+
+    const input = screen.getByLabelText('Voucher Code');
+    const button = screen.getByRole('button', { name: /redeem/i });
+
+    // Invalid code
+    fireEvent.change(input, { target: { value: 'abc' } });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid/i)).toBeInTheDocument();
+    });
+  });
 });
 ```
 
-### Step 2: Validation Function
+---
 
-Create `src/lib/sdui/validation.ts`:
+## Best Practices
 
-```typescript
-interface ValidationRule {
-  type: string;
-  value?: unknown;
-  message: string;
-}
-
-export function validateField(
-  value: unknown,
-  rules: ValidationRule[]
-): string | null {
-  for (const rule of rules) {
-    const error = validateRule(value, rule);
-    if (error) return error;
-  }
-  return null;
-}
-
-function validateRule(value: unknown, rule: ValidationRule): string | null {
-  switch (rule.type) {
-    case "required":
-      if (!value || (typeof value === "string" && !value.trim())) {
-        return rule.message;
-      }
-      break;
-
-    case "email":
-      if (typeof value === "string" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        return rule.message;
-      }
-      break;
-
-    case "phone":
-      if (typeof value === "string" && !/^\+?[\d\s-()]{10,}$/.test(value)) {
-        return rule.message;
-      }
-      break;
-
-    case "minLength":
-      if (typeof value === "string" && value.length < (rule.value as number)) {
-        return rule.message;
-      }
-      break;
-
-    case "maxLength":
-      if (typeof value === "string" && value.length > (rule.value as number)) {
-        return rule.message;
-      }
-      break;
-
-    case "min":
-      if (typeof value === "number" && value < (rule.value as number)) {
-        return rule.message;
-      }
-      break;
-
-    case "max":
-      if (typeof value === "number" && value > (rule.value as number)) {
-        return rule.message;
-      }
-      break;
-
-    case "pattern":
-      if (typeof value === "string") {
-        const regex = new RegExp(rule.value as string);
-        if (!regex.test(value)) {
-          return rule.message;
-        }
-      }
-      break;
-  }
-
-  return null;
-}
-```
-
-### Step 3: Integrate with Renderer
-
-```typescript
-// In renderer.tsx, when handling input changes
-const inputProps = useMemo(() => {
-  // ... existing logic
-
-  return {
-    // ... existing props
-    onBlur: () => {
-      // Validate on blur
-      if (node.validation) {
-        const error = validateField(
-          formState.values[fieldName],
-          node.validation
-        );
-        if (error) {
-          setFormError(fieldName, error);
-        }
-      }
-    },
-  };
-}, [...]);
-```
-
-### Step 4: Form-Level Validation
-
-```typescript
-// In screen-page.tsx
-const validateForm = useCallback(() => {
-  let isValid = true;
-
-  // Get all input components from screen
-  const inputs = findAllInputs(screen.components);
-
-  for (const input of inputs) {
-    if (input.validation) {
-      const fieldName = input.props?.name || input.id;
-      const value = formState.values[fieldName];
-      const error = validateField(value, input.validation);
-
-      if (error) {
-        setFormError(fieldName, error);
-        isValid = false;
-      }
-    }
-  }
-
-  return isValid;
-}, [screen, formState.values]);
-```
+1. **Feature flag everything** - New features should be toggle-able
+2. **Type everything** - Define types before implementation
+3. **Test the happy path** - At minimum, test success scenarios
+4. **Document as you go** - Update docs with new features
+5. **Follow existing patterns** - Consistency matters
 
 ---
 
 ## Next Steps
 
-- **[Troubleshooting](./08-troubleshooting.md)** - Common issues and debugging
+- [Troubleshooting](./08-troubleshooting.md) - Debug common issues
