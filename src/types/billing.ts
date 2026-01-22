@@ -113,3 +113,90 @@ export const InvoiceListResponseSchema = z.object({
 });
 
 export type InvoiceListResponse = z.infer<typeof InvoiceListResponseSchema>;
+
+// =============================================================================
+// Payment Types
+// =============================================================================
+
+export const PaymentStatusSchema = z.enum(["completed", "pending", "failed", "refunded"]);
+export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
+
+export const PaymentMethodTypeSchema = z.enum(["card", "bank", "cashapp", "mobile_money"]);
+export type PaymentMethodType = z.infer<typeof PaymentMethodTypeSchema>;
+
+export const PaymentSchema = z.object({
+  id: z.string(),
+  amount: z.number().positive(),
+  currency: z.string().default("USD"),
+  method: PaymentMethodTypeSchema,
+  status: PaymentStatusSchema,
+  date: z.string(), // ISO date string
+  reference: z.string(),
+  description: z.string().optional(),
+});
+
+export type Payment = z.infer<typeof PaymentSchema>;
+
+// =============================================================================
+// Payment Method Types (Saved payment methods)
+// =============================================================================
+
+export const SavedPaymentMethodSchema = z.object({
+  id: z.string(),
+  type: PaymentMethodTypeSchema,
+  last4: z.string().length(4),
+  label: z.string(), // e.g., "Visa ending in 4242" or "Bank of America"
+  expiryMonth: z.number().min(1).max(12).optional(), // Only for cards
+  expiryYear: z.number().optional(), // Only for cards
+  isDefault: z.boolean().default(false),
+});
+
+export type SavedPaymentMethod = z.infer<typeof SavedPaymentMethodSchema>;
+
+// =============================================================================
+// Payment Request Types (for form submission)
+// =============================================================================
+
+export const PaymentRequestSchema = z.object({
+  amount: z.number().positive(),
+  currency: z.string().default("USD"),
+  paymentMethodId: z.string().optional(), // Use saved payment method
+  paymentMethodType: PaymentMethodTypeSchema,
+  // Card details (required when not using saved method and type is card)
+  cardNumber: z.string().optional(),
+  cardExpiry: z.string().optional(), // MM/YY format
+  cardCvv: z.string().optional(),
+  cardName: z.string().optional(),
+  // Save for future use
+  savePaymentMethod: z.boolean().default(false),
+});
+
+export type PaymentRequest = z.infer<typeof PaymentRequestSchema>;
+
+// =============================================================================
+// Payment API Response Types
+// =============================================================================
+
+export const PaymentResponseSchema = z.object({
+  success: z.boolean(),
+  payment: PaymentSchema.optional(),
+  error: z.string().optional(),
+});
+
+export type PaymentResponse = z.infer<typeof PaymentResponseSchema>;
+
+export const PaymentHistoryResponseSchema = z.object({
+  payments: z.array(PaymentSchema),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  hasMore: z.boolean(),
+});
+
+export type PaymentHistoryResponse = z.infer<typeof PaymentHistoryResponseSchema>;
+
+export const PaymentMethodsResponseSchema = z.object({
+  methods: z.array(SavedPaymentMethodSchema),
+});
+
+export type PaymentMethodsResponse = z.infer<typeof PaymentMethodsResponseSchema>;
