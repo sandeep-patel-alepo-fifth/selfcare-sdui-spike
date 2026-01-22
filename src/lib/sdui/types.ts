@@ -1,31 +1,8 @@
-import { z } from "zod";
 import type { JsonSchema, UISchemaElement } from "@jsonforms/core";
+import type { TenantConfig, FeatureKey } from "@/types/tenant";
 
-// =============================================================================
-// Tenant Configuration
-// =============================================================================
-
-export const TenantConfigSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  domain: z.string().optional(),
-
-  // Branding
-  branding: z.object({
-    primaryColor: z.string().default("#6366f1"),
-    secondaryColor: z.string().optional(),
-    logo: z.string().optional(),
-    favicon: z.string().optional(),
-  }),
-
-  // Feature toggles
-  features: z.record(z.boolean()).default({}),
-
-  // Custom config per screen
-  screenConfig: z.record(z.unknown()).optional(),
-});
-
-export type TenantConfig = z.infer<typeof TenantConfigSchema>;
+// Re-export tenant types from central location
+export type { TenantConfig, FeatureKey };
 
 // =============================================================================
 // Screen Configuration
@@ -113,29 +90,3 @@ export interface ActionResult {
 }
 
 export type ActionHandler = (ctx: ActionContext) => Promise<ActionResult>;
-
-// =============================================================================
-// API Types
-// =============================================================================
-
-export interface GetScreenRequest {
-  tenantId: string;
-  screenId: string;
-  params?: Record<string, string>;
-}
-
-export interface GetScreenResponse {
-  screen: ScreenConfig;
-  tenant: Pick<TenantConfig, "id" | "name" | "branding">;
-}
-
-export interface ExecuteActionRequest {
-  tenantId: string;
-  screenId: string;
-  action: string;
-  data: Record<string, unknown>;
-}
-
-export interface ExecuteActionResponse {
-  result: ActionResult;
-}

@@ -1,46 +1,24 @@
-// Component Registry
-export { componentRegistry, getComponent, tabsComponents, cardComponents } from "./component-registry";
+/**
+ * Simplified Enterprise SDUI
+ *
+ * Uses proven open-source libraries:
+ * - JSON Forms for dynamic forms (enterprise-grade)
+ * - Zod for validation
+ * - Simple component mapping for layouts
+ * - Config-driven multi-tenancy
+ *
+ * Philosophy: "Use libraries, don't build frameworks"
+ */
 
-// Condition Evaluator
+// Re-export JSON Forms for forms
+export { JsonForms } from "@jsonforms/react";
 export {
-  evaluateCondition,
-  evaluateConditions,
-  evaluateAllConditions,
-  evaluateAnyCondition,
-} from "./condition-evaluator";
+  materialRenderers,
+  materialCells,
+} from "@jsonforms/material-renderers";
 
-// Data Binding
-export {
-  resolveBinding,
-  resolveDataBindings,
-  resolveTemplateString,
-  resolveAllTemplates,
-  setNestedValue,
-} from "./data-binding";
-
-// Action Dispatcher
-export {
-  executeAction,
-  executeActions,
-  createActionHandlers,
-  type ActionContext,
-} from "./action-dispatcher";
-
-// Renderer
-export {
-  ScreenRenderer,
-  useSDUIRenderer,
-  type SDUIContext,
-  type SDUIState,
-  type SDUIFormState,
-  type SDUIRendererProps,
-} from "./renderer";
-
-// Store
-export {
-  useSDUIStore,
-  mockUser,
-  mockTenant,
-  type SDUIContextData,
-  type SDUIStore,
-} from "./store";
+// Export our simple additions
+export { TenantProvider, useTenant } from "./tenant-context";
+export { ScreenLoader } from "./screen-loader";
+export { ActionExecutor, useActions } from "./actions";
+export type { TenantConfig, ScreenConfig, ActionResult } from "./types";
