@@ -200,3 +200,64 @@ export const PaymentMethodsResponseSchema = z.object({
 });
 
 export type PaymentMethodsResponse = z.infer<typeof PaymentMethodsResponseSchema>;
+
+// =============================================================================
+// Autopay Configuration Types
+// =============================================================================
+
+export const AutopayScheduleTypeSchema = z.enum(["day_of_month", "due_date", "threshold"]);
+export type AutopayScheduleType = z.infer<typeof AutopayScheduleTypeSchema>;
+
+export const AutopayConfigSchema = z.object({
+  enabled: z.boolean(),
+  paymentMethodId: z.string().nullable(),
+  scheduleType: AutopayScheduleTypeSchema,
+  dayOfMonth: z.number().min(1).max(28).nullable(), // 1-28 to avoid month-end issues
+  thresholdAmount: z.number().positive().nullable(), // Trigger when balance exceeds this
+  maxPaymentAmount: z.number().positive().nullable(), // Cap per autopay transaction
+  paymentMethodLabel: z.string().nullable(), // Display name like "Visa ending in 4242"
+  paymentMethodType: PaymentMethodTypeSchema.nullable(),
+  lastPaymentDate: z.string().nullable(), // ISO date string
+  lastPaymentAmount: z.number().nullable(),
+  nextScheduledDate: z.string().nullable(), // ISO date string
+  createdAt: z.string(), // ISO date string
+  updatedAt: z.string(), // ISO date string
+});
+
+export type AutopayConfig = z.infer<typeof AutopayConfigSchema>;
+
+// =============================================================================
+// Autopay Request Types
+// =============================================================================
+
+export const AutopayEnrollRequestSchema = z.object({
+  paymentMethodId: z.string(),
+  scheduleType: AutopayScheduleTypeSchema,
+  dayOfMonth: z.number().min(1).max(28).optional(),
+  thresholdAmount: z.number().positive().optional(),
+  maxPaymentAmount: z.number().positive().optional(),
+});
+
+export type AutopayEnrollRequest = z.infer<typeof AutopayEnrollRequestSchema>;
+
+export const AutopayUpdateRequestSchema = z.object({
+  paymentMethodId: z.string().optional(),
+  scheduleType: AutopayScheduleTypeSchema.optional(),
+  dayOfMonth: z.number().min(1).max(28).optional(),
+  thresholdAmount: z.number().positive().optional(),
+  maxPaymentAmount: z.number().positive().optional(),
+});
+
+export type AutopayUpdateRequest = z.infer<typeof AutopayUpdateRequestSchema>;
+
+// =============================================================================
+// Autopay API Response Types
+// =============================================================================
+
+export const AutopayResponseSchema = z.object({
+  success: z.boolean(),
+  autopay: AutopayConfigSchema.optional(),
+  error: z.string().optional(),
+});
+
+export type AutopayResponse = z.infer<typeof AutopayResponseSchema>;

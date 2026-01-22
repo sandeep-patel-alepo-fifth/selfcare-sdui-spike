@@ -6,3 +6,6 @@ export { PaymentMethodSelector } from "./PaymentMethodSelector";
 export { PaymentForm } from "./PaymentForm";
 export { PaymentHistory } from "./PaymentHistory";
 export { SavedPaymentMethods } from "./SavedPaymentMethods";
+export { AutopayStatus } from "./AutopayStatus";
+export { AutopayEnrollment } from "./AutopayEnrollment";
+export { AutopaySettings } from "./AutopaySettings";
