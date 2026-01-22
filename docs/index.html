@@ -43,7 +43,8 @@
       --code-block-padding: 1.25rem;
       --code-block-margin: 1.5rem 0;
       --code-block-border-radius: 8px;
-      --code-block-background: #1e293b;
+      --code-block-background: #f8fafc;
+      --code-block-border-color: #e2e8f0;
       --code-inline-background: #f1f5f9;
       --code-inline-color: #6366f1;
       --code-inline-padding: 0.2em 0.4em;
@@ -77,31 +78,13 @@
       --search-result-keyword-background: #fef08a;
     }
 
-    /* Dark mode */
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --sidebar-background: #1e293b;
-        --sidebar-border-color: #334155;
-        --sidebar-nav-link-color: #cbd5e1;
-        --base-color: #e2e8f0;
-        --heading-color: #f8fafc;
-        --code-inline-background: #334155;
-        --code-inline-color: #a5b4fc;
-        --blockquote-background: #1e293b;
-        --table-head-background: #1e293b;
-        --table-row-odd-background: #0f172a;
-        --table-row-even-background: #1e293b;
-        --search-input-background-color: #1e293b;
-        --search-input-border-color: #334155;
-      }
+    /* Force light mode */
+    body {
+      background-color: #ffffff;
+    }
 
-      body {
-        background-color: #0f172a;
-      }
-
-      .markdown-section {
-        background-color: #0f172a;
-      }
+    .markdown-section {
+      background-color: #ffffff;
     }
 
     /* Better paragraph spacing */
@@ -147,13 +130,25 @@
     .docsify-copy-code-button {
       font-size: 0.75rem !important;
       padding: 4px 8px !important;
-      background: #475569 !important;
-      color: #e2e8f0 !important;
+      background: #e2e8f0 !important;
+      color: #334155 !important;
       border-radius: 4px !important;
+      border: 1px solid #cbd5e1 !important;
     }
 
     .docsify-copy-code-button:hover {
       background: #6366f1 !important;
+      color: #ffffff !important;
+      border-color: #6366f1 !important;
+    }
+
+    /* Code block border */
+    .markdown-section pre {
+      border: 1px solid #e2e8f0;
+    }
+
+    .markdown-section pre > code {
+      color: #1e293b;
     }
 
     /* Smooth scrolling */
