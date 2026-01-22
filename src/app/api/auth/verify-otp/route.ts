@@ -5,6 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { phone, otp } = body;
+    const tenantId = request.headers.get("x-tenant-id") || "default";
 
     if (!phone || !otp) {
       return NextResponse.json(
@@ -36,10 +37,26 @@ export async function POST(request: NextRequest) {
 
     console.log(`[MOCK API] OTP verified for ${phone}`);
 
+    // Return mock user data for existing user login
+    const user = {
+      id: `user_${Date.now()}`,
+      tenantId,
+      phone,
+      firstName: "John",
+      lastName: "Doe",
+      email: "john.doe@example.com",
+      accountType: "postpaid" as const,
+      status: "active" as const,
+      roles: ["user"],
+      mfaEnabled: true,
+      lastLoginAt: new Date().toISOString(),
+    };
+
     return NextResponse.json({
       success: true,
       message: "Phone number verified successfully",
       verified: true,
+      user,
     });
   } catch (error) {
     console.error("Verify OTP error:", error);

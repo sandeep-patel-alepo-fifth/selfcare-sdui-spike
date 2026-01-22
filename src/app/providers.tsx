@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { TenantProvider } from "@/lib/core/tenant-context";
+import { AuthProvider } from "@/lib/core/auth-context";
 import { getTenantById, DEFAULT_TENANT } from "@/types/tenant";
 
 interface ProvidersProps {
@@ -14,5 +15,9 @@ export function Providers({ children, tenantId }: ProvidersProps) {
   // For development, we use a default or query param
   const tenant = tenantId ? getTenantById(tenantId) : DEFAULT_TENANT;
 
-  return <TenantProvider tenant={tenant}>{children}</TenantProvider>;
+  return (
+    <TenantProvider tenant={tenant}>
+      <AuthProvider>{children}</AuthProvider>
+    </TenantProvider>
+  );
 }

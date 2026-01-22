@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { phone, firstName, lastName, email, plan, planType } = body;
+    const tenantId = request.headers.get("x-tenant-id") || "default";
 
     // Validate required fields
     const missingFields = [];
@@ -65,14 +66,29 @@ export async function POST(request: NextRequest) {
     // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Create user
-    const userId = `user-${Date.now()}`;
+    // Create user (matches User type from types/auth.ts)
+    const userId = `user_${Date.now()}`;
     const user = {
       id: userId,
+      tenantId,
       phone: cleanPhone,
       firstName,
       lastName,
       email,
+      accountType: planType as "prepaid" | "postpaid",
+      status: "active" as const,
+      roles: ["user"],
+      mfaEnabled: true,
+      preferences: {
+        language: "en",
+        notifications: {
+          email: true,
+          sms: true,
+          push: false,
+        },
+      },
+      createdAt: new Date().toISOString(),
+      // Additional plan/usage info for display
       plan: {
         id: plan,
         type: planType,
@@ -85,27 +101,17 @@ export async function POST(request: NextRequest) {
         sms: { used: 0, total: selectedPlan.sms === -1 ? 9999 : selectedPlan.sms, unit: "SMS" },
       },
       balance: planType === "prepaid" ? selectedPlan.price : 0,
-      createdAt: new Date().toISOString(),
     };
 
     // Store user
     users.set(cleanPhone, user);
 
-    console.log(`[MOCK API] User registered:`, { userId, phone, plan, planType });
+    console.log(`[MOCK API] User registered:`, { userId, phone, plan, planType, tenantId });
 
     return NextResponse.json({
       success: true,
       message: "Account created successfully",
-      user: {
-        id: userId,
-        firstName,
-        lastName,
-        email,
-        phone,
-        plan: user.plan,
-        usage: user.usage,
-        balance: user.balance,
-      },
+      user,
     });
   } catch (error) {
     console.error("Register error:", error);
